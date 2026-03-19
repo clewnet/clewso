@@ -397,10 +397,7 @@ def serve(
 
         from .server.main import app as fastapi_app  # noqa: F811
     except ImportError:
-        console.print(
-            "[bold red]Error:[/bold red] Server dependencies not installed. "
-            "Run: pip install clewso[server]"
-        )
+        console.print("[bold red]Error:[/bold red] Server dependencies not installed. Run: pip install clewso[server]")
         raise typer.Exit(1) from None
 
     cfg = get_config()
@@ -417,10 +414,7 @@ def mcp_cmd():
     try:
         from .mcp.server import mcp  # noqa: F811
     except ImportError:
-        console.print(
-            "[bold red]Error:[/bold red] MCP dependencies not installed. "
-            "Run: pip install clewso[mcp]"
-        )
+        console.print("[bold red]Error:[/bold red] MCP dependencies not installed. Run: pip install clewso[mcp]")
         raise typer.Exit(1) from None
 
     mcp.run()

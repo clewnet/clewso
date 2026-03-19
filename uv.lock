@@ -192,7 +192,7 @@ wheels = [
 
 [[package]]
 name = "clewso"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "." }
 dependencies = [
     { name = "clewso-ingestion" },
@@ -275,7 +275,7 @@ dev = [
 
 [[package]]
 name = "clewso-core"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "packages/clew-core" }
 dependencies = [
     { name = "httpx" },
@@ -306,7 +306,7 @@ dev = [
 
 [[package]]
 name = "clewso-ingestion"
-version = "0.1.1"
+version = "0.1.4"
 source = { editable = "packages/clew-ingestion" }
 dependencies = [
     { name = "clewso-core" },
