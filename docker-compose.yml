@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # DATA PLANE
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:v1.13.0
+    container_name: clewso-qdrant
+    ports:
+      - "6335:6333"
+      - "6336:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - clewso-network
+
+  neo4j:
+    image: neo4j:5.16
+    container_name: clewso-neo4j
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    volumes:
+      - neo4j_data:/data
+    environment:
+      - NEO4J_AUTH=neo4j/password # Change this in production!
+      - NEO4J_PLUGINS=["apoc"]
+    networks:
+      - clewso-network
+
+  # ---------------------------------------------------------------------------
+  # COMPUTE PLANE
+  # ---------------------------------------------------------------------------
+  api:
+    build: .
+    command: ["clewso", "serve", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      - qdrant
+      - neo4j
+    environment:
+      - CLEWSO_STORE_QDRANT_HOST=clewso-qdrant
+      - CLEWSO_STORE_QDRANT_PORT=6333
+      - CLEWSO_STORE_NEO4J_URI=bolt://clewso-neo4j:7687
+      - CLEWSO_STORE_NEO4J_USER=neo4j
+      - CLEWSO_STORE_NEO4J_PASSWORD=password
+
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CLEWSO_EMBEDDINGS_OPENAI_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_EMBEDDING_MODEL=${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - clewso-network
+
+  ingestion:
+    build: .
+    command: ["clewso", "index", "/app/repo"]
+    volumes:
+      - .:/app/repo
+    environment:
+      - CLEWSO_STORE_QDRANT_HOST=clewso-qdrant
+      - CLEWSO_STORE_QDRANT_PORT=6333
+      - CLEWSO_STORE_NEO4J_URI=bolt://clewso-neo4j:7687
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - clewso-network
+
+networks:
+  clewso-network:
+    driver: bridge
+
+volumes:
+  qdrant_data:
+  neo4j_data:

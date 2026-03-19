@@ -1,0 +1,26 @@
+# Ruff configuration file
+# See: https://docs.astral.sh/ruff/settings/
+
+target-version = "py311"
+line-length = 120
+
+[lint]
+# Enable Pyflakes (F), pycodestyle (E, W), isort (I), and mccabe complexity (C901)
+select = ["F", "E", "W", "I", "C901", "B", "UP"]
+# B008: FastAPI Depends() in function arguments is the correct pattern
+ignore = ["B008"]
+
+# Allow fix for all enabled rules (when `--fix`)
+fixable = ["ALL"]
+unfixable = []
+
+[lint.mccabe]
+# Flag functions with a complexity level higher than 10.
+# (Lizard default is 15, we're being more strict)
+max-complexity = 10
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

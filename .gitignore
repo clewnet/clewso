@@ -1,0 +1,36 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+.DS_Store
+bin/
+build/
+dist/
+*.egg-info/
+venv/
+.venv/
+.idea/
+.vscode/
+.mcp.json
+*.log
+
+# Caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Local configs
+.beads/
+.claude/*
+!.claude/hooks/
+!.claude/settings.json
+.cursor/
+
+# Local PR files
+
+*.diff
+.dev/

@@ -1,0 +1,53 @@
+site_name: Clewso
+site_url: https://clewso.sh
+site_description: The Open Source Context Server for AI Agents
+repo_url: https://github.com/clewnet/clewso
+repo_name: clewnet/clewso
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/install.md
+      - Quick Start: getting-started/quickstart.md
+      - Editor Setup: getting-started/editors.md
+  - Guides:
+      - Indexing a Repo: guides/indexing.md
+      - Smart Review: guides/review.md
+      - MCP Tools: guides/mcp-tools.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Packages: architecture/packages.md
+  - API Reference:
+      - Search: api/search.md
+      - Graph: api/graph.md
+      - Policies: api/policies.md

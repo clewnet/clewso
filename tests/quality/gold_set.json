@@ -1,0 +1,625 @@
+{
+  "_meta": {
+    "description": "Retrieval quality gold set for Clew Engine (updated to match actual repo structure)",
+    "version": "1.0.0",
+    "created": "2026-02-12",
+    "target_metrics": {
+      "mrr": 0.7,
+      "recall_at_3": 0.8
+    },
+    "instructions": "Run `python tests/quality/measure_mrr.py` against a live Clew instance with an indexed repo. Each query has expected file paths that MUST appear in the top-k results.",
+    "notes": "Queries updated to reflect actual file paths in packages/clew-api, packages/clew-mcp, and packages/clew-ingestion"
+  },
+  "queries": [
+    {
+      "id": "Q02",
+      "query": "database connection setup",
+      "category": "infrastructure",
+      "expected_paths": [
+        "packages/clew-api/src/config.py"
+      ],
+      "expected_concepts": [
+        "get_db",
+        "DATABASE_URL"
+      ],
+      "notes": "Connection pooling, engine creation, session factory."
+    },
+    {
+      "id": "Q03",
+      "query": "how are API routes registered?",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-api/src/main.py"
+      ],
+      "expected_concepts": [
+        "include_router",
+        "APIRouter"
+      ],
+      "notes": "Should surface the FastAPI app setup."
+    },
+    {
+      "id": "Q06",
+      "query": "how are environment variables loaded?",
+      "category": "configuration",
+      "expected_paths": [
+        "packages/clew-api/src/config.py"
+      ],
+      "expected_concepts": [
+        "Settings",
+        "BaseSettings",
+        "env_file"
+      ],
+      "notes": "Pydantic settings, .env loading."
+    },
+    {
+      "id": "Q07",
+      "query": "webhook signature verification",
+      "category": "security",
+      "expected_paths": [
+        "packages/clew-api/src/routes/webhooks.py"
+      ],
+      "expected_concepts": [
+        "verify_signature",
+        "HMAC",
+        "X-Hub-Signature"
+      ],
+      "notes": "GitHub/GitLab webhook security."
+    },
+    {
+      "id": "Q08",
+      "query": "graph traversal implementation",
+      "category": "core-feature",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/neo4j.py",
+        "packages/clew-api/src/routes/graph.py"
+      ],
+      "expected_concepts": [
+        "traverse",
+        "MATCH",
+        "depth"
+      ],
+      "notes": "Variable-depth Neo4j traversal with relationship filtering."
+    },
+    {
+      "id": "Q09",
+      "query": "embedding generation and fallback",
+      "category": "core-feature",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/embeddings.py"
+      ],
+      "expected_concepts": [
+        "OpenAIEmbeddings",
+        "HashEmbeddings",
+        "embed"
+      ],
+      "notes": "Primary provider + hash fallback mechanism."
+    },
+    {
+      "id": "Q10",
+      "query": "vector search with filters",
+      "category": "core-feature",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/qdrant.py",
+        "packages/clew-api/src/routes/search.py"
+      ],
+      "expected_concepts": [
+        "search",
+        "QdrantStore",
+        "query_vector"
+      ],
+      "notes": "Qdrant adapter with repo and path filtering."
+    },
+    {
+      "id": "Q11",
+      "query": "how do tests mock external services?",
+      "category": "testing",
+      "expected_paths": [
+        "packages/clew-api/tests/conftest.py"
+      ],
+      "expected_concepts": [
+        "dependency_overrides",
+        "AsyncMock"
+      ],
+      "notes": "FastAPI dependency override pattern."
+    },
+    {
+      "id": "Q12",
+      "query": "incremental sync after git push",
+      "category": "feature-discovery",
+      "expected_paths": [
+        "packages/clew-api/src/routes/webhooks.py"
+      ],
+      "expected_concepts": [
+        "dispatch_sync_job",
+        "extract_changes",
+        "deduplication"
+      ],
+      "notes": "Webhook -> diff extraction -> job dispatch."
+    },
+    {
+      "id": "Q13",
+      "query": "Mermaid diagram generation",
+      "category": "visualization",
+      "expected_paths": [
+        "packages/clew-mcp/src/formatters.py"
+      ],
+      "expected_concepts": [
+        "build_mermaid_diagram",
+        "graph TD"
+      ],
+      "notes": "MCP output formatting for visual dependency graphs."
+    },
+    {
+      "id": "Q14",
+      "query": "adapter registry pattern",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/__init__.py",
+        "packages/clew-api/src/dependencies.py"
+      ],
+      "expected_concepts": [
+        "registry",
+        "register",
+        "get"
+      ],
+      "notes": "Dynamic adapter selection via registry."
+    },
+    {
+      "id": "Q15",
+      "query": "MCP tool definitions",
+      "category": "agent-interface",
+      "expected_paths": [
+        "packages/clew-mcp/src/server.py"
+      ],
+      "expected_concepts": [
+        "search_codebase",
+        "explore_module",
+        "verify_concept"
+      ],
+      "notes": "The three core MCP tools exposed to AI agents."
+    },
+    {
+      "id": "Q16",
+      "query": "health check endpoints",
+      "category": "operations",
+      "expected_paths": [
+        "packages/clew-api/src/main.py"
+      ],
+      "expected_concepts": [
+        "health",
+        "status"
+      ],
+      "notes": "Liveness/readiness probes."
+    },
+    {
+      "id": "Q17",
+      "query": "how are code files parsed and indexed?",
+      "category": "ingestion",
+      "expected_paths": [
+        "packages/clew-ingestion/src/parser.py"
+      ],
+      "expected_concepts": [
+        "parse",
+        "AST",
+        "tree-sitter"
+      ],
+      "notes": "Code parsing pipeline for ingestion."
+    },
+    {
+      "id": "Q19",
+      "query": "docker compose service configuration",
+      "category": "infrastructure",
+      "expected_paths": [
+        "docker-compose.yml"
+      ],
+      "expected_concepts": [
+        "qdrant",
+        "neo4j",
+        "redis"
+      ],
+      "notes": "Service orchestration and networking."
+    },
+    {
+      "id": "Q20",
+      "query": "how does the PR reviewer bot work?",
+      "category": "feature-discovery",
+      "expected_paths": [
+        "examples/clew_bot.py"
+      ],
+      "expected_concepts": [
+        "clew_bot",
+        "review",
+        "Mermaid"
+      ],
+      "notes": "Clew-Bot PR analysis with dependency graph output."
+    },
+    {
+      "id": "Q21",
+      "query": "input validation and security",
+      "category": "security",
+      "expected_paths": [
+        "packages/clew-api/src/routes/search.py",
+        "packages/clew-api/src/routes/graph.py"
+      ],
+      "expected_concepts": [
+        "Field",
+        "max_length",
+        "ALLOWED_RELATIONSHIPS"
+      ],
+      "notes": "Pydantic validation + relationship allowlist."
+    },
+    {
+      "id": "Q22",
+      "query": "what logging framework is used?",
+      "category": "observability",
+      "expected_paths": [
+        "packages/clew-api/src/main.py",
+        "packages/clew-api/src/routes/search.py"
+      ],
+      "expected_concepts": [
+        "logging",
+        "getLogger"
+      ],
+      "notes": "Python standard logging setup."
+    },
+    {
+      "id": "Q23",
+      "query": "how are background jobs queued?",
+      "category": "infrastructure",
+      "expected_paths": [
+        "packages/clew-api/src/routes/webhooks.py"
+      ],
+      "expected_concepts": [
+        "BackgroundTasks",
+        "dispatch",
+        "arq"
+      ],
+      "notes": "Webhook-triggered async job processing."
+    },
+    {
+      "id": "Q24",
+      "query": "Redis usage for state management",
+      "category": "infrastructure",
+      "expected_paths": [
+        "packages/clew-api/src/routes/webhooks.py"
+      ],
+      "expected_concepts": [
+        "redis",
+        "setex",
+        "deduplication"
+      ],
+      "notes": "Redis for webhook deduplication and state."
+    },
+    {
+      "id": "Q25",
+      "query": "protocol and interface definitions",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/base.py"
+      ],
+      "expected_concepts": [
+        "Protocol",
+        "VectorStore",
+        "GraphStore",
+        "EmbeddingProvider"
+      ],
+      "notes": "Runtime-checkable protocol definitions."
+    },
+    {
+      "id": "Q26",
+      "query": "how does concept verification prevent hallucination?",
+      "category": "core-feature",
+      "expected_paths": [
+        "packages/clew-mcp/src/server.py"
+      ],
+      "expected_concepts": [
+        "verify_concept",
+        "VERIFICATION"
+      ],
+      "notes": "The system backstop tool for AI agent accuracy."
+    },
+    {
+      "id": "Q27",
+      "query": "Ollama local embedding support",
+      "category": "configuration",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/embeddings.py"
+      ],
+      "expected_concepts": [
+        "OllamaEmbeddings",
+        "OLLAMA_TIMEOUT"
+      ],
+      "notes": "Local LLM embedding adapter."
+    },
+    {
+      "id": "Q28",
+      "query": "GitHub Actions CI/CD workflow",
+      "category": "operations",
+      "expected_paths": [
+        ".github/workflows/clew-pr-analysis.yml"
+      ],
+      "expected_concepts": [
+        "clew-pr-analysis",
+        "CLEW_API_URL"
+      ],
+      "notes": "PR analysis GitHub Action."
+    },
+    {
+      "id": "Q29",
+      "query": "data model for search results",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/base.py",
+        "packages/clew-api/src/routes/search.py"
+      ],
+      "expected_concepts": [
+        "SearchResult",
+        "SearchResultResponse",
+        "dataclass"
+      ],
+      "notes": "Shared data classes for the search pipeline."
+    },
+    {
+      "id": "Q30",
+      "query": "how are graph nodes and edges structured?",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/base.py"
+      ],
+      "expected_concepts": [
+        "GraphNode",
+        "GraphEdge",
+        "GraphResult"
+      ],
+      "notes": "Core graph data model."
+    },
+    {
+      "id": "Q31",
+      "query": "dependency injection pattern",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-api/src/dependencies.py"
+      ],
+      "expected_concepts": [
+        "Depends",
+        "get_vector_store",
+        "get_graph_store"
+      ],
+      "notes": "FastAPI DI with lru_cache."
+    },
+    {
+      "id": "Q32",
+      "query": "how is the Qdrant collection configured?",
+      "category": "infrastructure",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/qdrant.py"
+      ],
+      "expected_concepts": [
+        "QdrantClient",
+        "collection_name",
+        "EMBEDDING_DIMENSION"
+      ],
+      "notes": "Qdrant vector store setup."
+    },
+    {
+      "id": "Q33",
+      "query": "Neo4j Cypher query construction",
+      "category": "core-feature",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/neo4j.py"
+      ],
+      "expected_concepts": [
+        "MATCH",
+        "backtick",
+        "variable-length"
+      ],
+      "notes": "Parameterized Cypher with injection protection."
+    },
+    {
+      "id": "Q37",
+      "query": "multi-repository support",
+      "category": "feature-discovery",
+      "expected_paths": [
+        "packages/clew-api/src/routes/search.py"
+      ],
+      "expected_concepts": [
+        "repo",
+        "repo_id"
+      ],
+      "notes": "Repository-scoped search filtering."
+    },
+    {
+      "id": "Q38",
+      "query": "noop graph store implementation",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/noop_graph.py"
+      ],
+      "expected_concepts": [
+        "NoopGraphStore",
+        "GraphResult"
+      ],
+      "notes": "Fallback when Neo4j is unavailable."
+    },
+    {
+      "id": "Q39",
+      "query": "PgVector alternative storage",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/pgvector.py"
+      ],
+      "expected_concepts": [
+        "PgVectorStore",
+        "asyncpg"
+      ],
+      "notes": "PostgreSQL-based vector storage alternative."
+    },
+    {
+      "id": "Q41",
+      "query": "GitLab webhook integration",
+      "category": "integration",
+      "expected_paths": [
+        "packages/clew-api/src/routes/webhooks.py"
+      ],
+      "expected_concepts": [
+        "GitLabWebhookProcessor",
+        "X-Gitlab-Token"
+      ],
+      "notes": "GitLab push event processing."
+    },
+    {
+      "id": "Q42",
+      "query": "search result scoring and ranking",
+      "category": "core-feature",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/qdrant.py",
+        "packages/clew-api/src/routes/search.py"
+      ],
+      "expected_concepts": [
+        "score",
+        "similarity"
+      ],
+      "notes": "Vector similarity scoring."
+    },
+    {
+      "id": "Q43",
+      "query": "code graph relationship types",
+      "category": "data-model",
+      "expected_paths": [
+        "packages/clew-api/src/routes/graph.py"
+      ],
+      "expected_concepts": [
+        "IMPORTS",
+        "CALLS",
+        "CONTAINS",
+        "DEFINES"
+      ],
+      "notes": "The four supported relationship types."
+    },
+    {
+      "id": "Q44",
+      "query": "how does the explore_module tool work?",
+      "category": "agent-interface",
+      "expected_paths": [
+        "packages/clew-mcp/src/server.py"
+      ],
+      "expected_concepts": [
+        "explore_module",
+        "path_contains",
+        "traverse"
+      ],
+      "notes": "Module analysis: search -> traverse -> format."
+    },
+    {
+      "id": "Q45",
+      "query": "webhook event deduplication",
+      "category": "reliability",
+      "expected_paths": [
+        "packages/clew-api/src/routes/webhooks.py"
+      ],
+      "expected_concepts": [
+        "check_deduplication",
+        "redis",
+        "TTL"
+      ],
+      "notes": "Redis-based idempotency for webhook events."
+    },
+    {
+      "id": "Q46",
+      "query": "async context manager patterns",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-mcp/src/client.py"
+      ],
+      "expected_concepts": [
+        "__aenter__",
+        "__aexit__",
+        "AsyncClient"
+      ],
+      "notes": "httpx async client lifecycle."
+    },
+    {
+      "id": "Q47",
+      "query": "vector batch operations",
+      "category": "ingestion",
+      "expected_paths": [
+        "packages/clew-ingestion/src/vector.py"
+      ],
+      "expected_concepts": [
+        "batch",
+        "upsert"
+      ],
+      "notes": "Batch vector uploads during ingestion."
+    },
+    {
+      "id": "Q48",
+      "query": "graph construction during ingestion",
+      "category": "ingestion",
+      "expected_paths": [
+        "packages/clew-ingestion/src/graph.py"
+      ],
+      "expected_concepts": [
+        "create_node",
+        "create_edge"
+      ],
+      "notes": "Building the code graph from parsed AST."
+    },
+    {
+      "id": "Q49",
+      "query": "API versioning strategy",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-api/src/main.py"
+      ],
+      "expected_concepts": [
+        "/v1/",
+        "prefix"
+      ],
+      "notes": "URL-based API versioning."
+    },
+    {
+      "id": "Q50",
+      "query": "hash embedding deterministic fallback",
+      "category": "reliability",
+      "expected_paths": [
+        "packages/clew-api/src/adapters/embeddings.py"
+      ],
+      "expected_concepts": [
+        "HashEmbeddings",
+        "SHA256",
+        "deterministic"
+      ],
+      "notes": "Deterministic fallback when embedding providers are unavailable."
+    },
+    {
+      "id": "Q51",
+      "query": "how does the ingestion pipeline parse code?",
+      "category": "core-feature",
+      "expected_paths": [
+        "packages/clew-ingestion/src/parser.py",
+        "packages/clew-ingestion/src/ingest.py"
+      ],
+      "expected_concepts": [
+        "parse_file",
+        "CodeParser",
+        "extract_symbols"
+      ],
+      "notes": "Code parsing for indexing into the graph."
+    },
+    {
+      "id": "Q52",
+      "query": "pipeline orchestration and stages",
+      "category": "architecture",
+      "expected_paths": [
+        "packages/clew-ingestion/src/pipeline/orchestrator.py",
+        "packages/clew-ingestion/src/pipeline/base.py"
+      ],
+      "expected_concepts": [
+        "PipelineOrchestrator",
+        "Stage",
+        "execute"
+      ],
+      "notes": "Multi-stage ingestion pipeline orchestration."
+    }
+  ]
+}
