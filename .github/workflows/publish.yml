@@ -10,31 +10,25 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        package:
-          - name: clewso-core
-            path: packages/clew-core
-          - name: clewso-ingestion
-            path: packages/clew-ingestion
-          - name: clewso
-            path: .
-    name: build (${{ matrix.package.name }})
     steps:
       - uses: actions/checkout@v6
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
-      - name: Build package
-        working-directory: ${{ matrix.package.path }}
-        run: uv build
+      - name: Build all packages
+        run: |
+          # uv build from workspace members outputs to root dist/
+          cd packages/clew-core && uv build && cd ../..
+          cd packages/clew-ingestion && uv build && cd ../..
+          uv build
+          ls -la dist/
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-${{ matrix.package.name }}
-          path: ${{ matrix.package.path }}/dist/
+          name: dist
+          path: dist/
 
   # Publish in dependency order: core → ingestion → clewso
   publish-core:
@@ -46,8 +40,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: dist-clewso-core
-          path: dist/
+          name: dist
+          path: dist-all/
+      - run: |
+          mkdir -p dist
+          cp dist-all/clewso_core-* dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
 
   publish-ingestion:
@@ -59,8 +56,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: dist-clewso-ingestion
-          path: dist/
+          name: dist
+          path: dist-all/
+      - run: |
+          mkdir -p dist
+          cp dist-all/clewso_ingestion-* dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
 
   publish-clewso:
@@ -72,6 +72,10 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: dist-clewso
-          path: dist/
+          name: dist
+          path: dist-all/
+      - run: |
+          mkdir -p dist
+          # Copy only the root clewso package (not core or ingestion)
+          cp dist-all/clewso-* dist/
       - uses: pypa/gh-action-pypi-publish@release/v1
