@@ -11,6 +11,7 @@ CPU-bound C library call.
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator
 from typing import Any
 
 from ..context import FileItem, IngestionContext, ParsedNode, ProcessingResult, ProcessingStatus
@@ -19,8 +20,9 @@ from ..ids import make_vector_id
 
 logger = logging.getLogger(__name__)
 
-# Number of files to accumulate before flushing embed + graph batches
-BATCH_SIZE = 50
+# Number of files to accumulate before flushing embed + graph batches.
+# Smaller batches yield more processing tasks for better parallelism.
+BATCH_SIZE = 10
 
 # Maximum length for the structured file summary sent to the embedding model
 _MAX_SUMMARY_LENGTH = 4000
@@ -173,6 +175,58 @@ class ParsingStage:
             errors=errors,
             metadata={"nodes_extracted": nodes_extracted},
         )
+
+    async def stream_nodes(
+        self,
+        context: IngestionContext,
+    ) -> AsyncIterator[list[ParsedNode]]:
+        """Async generator that yields batches of parsed nodes as files are processed.
+
+        File-level embeddings and graph operations are flushed per batch
+        (same as ``execute``), but nodes are yielded immediately so
+        downstream stages can start processing without waiting for all
+        files to finish.
+
+        Yields:
+            Lists of ParsedNode extracted from the current batch of files.
+        """
+        node_batch: list[ParsedNode] = []
+        embed_batch: list[tuple[str, dict[str, Any], str | None]] = []
+        graph_ops: list[tuple[str, dict[str, Any]]] = []
+
+        async for file_item, content in self._file_reader(context.files):
+            try:
+                nodes_count, file_embed_item, file_graph_op = await self._process_file(file_item, content, context)
+                embed_batch.append(file_embed_item)
+                graph_ops.append(file_graph_op)
+
+                # Collect the nodes that were appended to context.nodes
+                node_batch.extend(context.nodes[len(context.nodes) - nodes_count :])
+
+                if len(embed_batch) >= BATCH_SIZE:
+                    try:
+                        await self._flush_batch(embed_batch, graph_ops, context)
+                    except Exception as e:
+                        logger.error("[%s] Failed to flush batch: %s", self.name, e)
+                    finally:
+                        embed_batch, graph_ops = [], []
+
+                    if node_batch:
+                        yield node_batch
+                        node_batch = []
+
+            except Exception as e:
+                logger.error("[%s] Failed to process %s: %s", self.name, file_item.path, e)
+
+        # Flush remainder
+        if embed_batch:
+            try:
+                await self._flush_batch(embed_batch, graph_ops, context)
+            except Exception as e:
+                logger.error("[%s] Failed to flush final batch: %s", self.name, e)
+
+        if node_batch:
+            yield node_batch
 
     async def _file_reader(self, files: list[FileItem]):
         """

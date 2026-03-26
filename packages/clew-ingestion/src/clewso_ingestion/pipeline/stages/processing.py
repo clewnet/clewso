@@ -16,21 +16,19 @@ Supports two code paths:
 
 import asyncio
 import logging
-import uuid
 from typing import Any
 
 from ..context import IngestionContext, ProcessingResult, ProcessingStatus
+from ..ids import make_block_id
 from ..processors.registry import NodeProcessorRegistry
 from ..stdlib_filter import is_stdlib_or_vendor
 
 logger = logging.getLogger(__name__)
 
-# Default batch size for batched processing path
-DEFAULT_BATCH_SIZE = 50
+DEFAULT_BATCH_SIZE = 250
 
 # ---------------------------------------------------------------------------
-# Cypher query constants — mirrors the queries in GraphStore's individual
-# create_* methods so both code paths produce identical graph structures.
+# Cypher query constants
 # ---------------------------------------------------------------------------
 
 _CREATE_CODE_NODE_CYPHER = """
@@ -60,290 +58,292 @@ MERGE (f)-[:CALLS]->(t)
 """
 
 
-class ProcessingStage:
-    """
-    Fourth stage: Process AST nodes.
+# ---------------------------------------------------------------------------
+# Shared helpers — used by both batched and per-node code paths
+# ---------------------------------------------------------------------------
 
-    Responsibilities:
-    - Iterate through extracted nodes
-    - Batch embedding and graph operations for throughput
-    - Fall back to per-node processors when batching is disabled
-    - Handle errors gracefully
-    """
 
-    name = "Processing"
+def _determine_status(processed: int, failed: int, errors: list[dict[str, str]]) -> ProcessingStatus:
+    """Derive processing status from counters."""
+    if failed == 0 and not errors:
+        return ProcessingStatus.SUCCESS
+    if processed > 0:
+        return ProcessingStatus.PARTIAL
+    return ProcessingStatus.FAILED
 
-    def __init__(self, registry: NodeProcessorRegistry):
-        """
-        Initialize processing stage.
 
-        Args:
-            registry: Node processor registry with registered processors
-        """
-        self.registry = registry
+def _build_result(processed: int, failed: int, errors: list[dict[str, str]]) -> ProcessingResult:
+    """Build a ``ProcessingResult`` from counters."""
+    return ProcessingResult(
+        status=_determine_status(processed, failed, errors),
+        message=f"Processed {processed} nodes ({failed} failed)",
+        items_processed=processed,
+        items_failed=failed,
+        errors=errors,
+    )
 
-    async def execute(self, context: IngestionContext) -> ProcessingResult:
-        """
-        Process all extracted nodes.
 
-        Uses the batched path by default.  Set
-        ``context.config["batch_processing"] = False`` to use the per-node
-        registry path instead.
+def _node_to_dict(node: Any) -> dict[str, Any]:
+    """Convert a ``ParsedNode`` to the dict format expected by per-node processors."""
+    return {
+        "type": node.type,
+        "kind": node.kind,
+        "name": node.name,
+        "content": node.content,
+        "start_line": node.start_line,
+        "end_line": node.end_line,
+        "file_path": node.file_path,
+    }
 
-        Args:
-            context: Ingestion context
 
-        Returns:
-            ProcessingResult with processing statistics
-        """
-        use_batched = context.config.get("batch_processing", True)
+# ---------------------------------------------------------------------------
+# Batch collector — accumulates Cypher + embedding ops for a single node
+# ---------------------------------------------------------------------------
 
-        if use_batched:
-            return await self._execute_batched(context)
-        return await self._execute_per_node(context)
 
-    # ------------------------------------------------------------------
-    # Batched code path
-    # ------------------------------------------------------------------
+class _NodeCollector:
+    """Translates parsed nodes into graph operations and embedding items."""
 
-    async def _execute_batched(self, context: IngestionContext) -> ProcessingResult:
-        """Process nodes in batches for high-throughput graph + vector writes."""
-        logger.info(f"[{self.name}] Processing {len(context.nodes)} nodes (batched)")
-
-        batch_size: int = context.config.get("processing_batch_size", DEFAULT_BATCH_SIZE)
-
-        embed_items: list[tuple[str, dict[str, Any], str]] = []
-        graph_ops: list[tuple[str, dict[str, Any]]] = []
-
-        nodes_processed = 0
-        nodes_failed = 0
-        errors: list[dict[str, str]] = []
-
-        for node in context.nodes:
-            try:
-                success = self._collect_node_operations(node, context.repo_id, embed_items, graph_ops)
-                if not success:
-                    nodes_failed += 1
-                    continue
-
-                nodes_processed += 1
-
-                # Flush when batch is large enough
-                if len(graph_ops) >= batch_size:
-                    await self._flush_batch(context, embed_items, graph_ops)
-                    embed_items = []
-                    graph_ops = []
-
-            except Exception as e:
-                nodes_failed += 1
-                errors.append(
-                    {
-                        "context": f"{node.type} {node.name} in {node.file_path}",
-                        "error": str(e),
-                    }
-                )
-                logger.error(f"[{self.name}] Failed to collect node {node.name}: {e}")
-
-        # Final flush for remainder
-        if embed_items or graph_ops:
-            try:
-                await self._flush_batch(context, embed_items, graph_ops)
-            except Exception as e:
-                logger.error(f"[{self.name}] Final batch flush failed: {e}")
-                errors.append({"context": "batch_flush", "error": str(e)})
-                if nodes_processed > 0:
-                    # Downgrade to partial since some data may have been flushed
-                    pass  # status logic below handles this
-
-        # Determine overall status
-        status = self._determine_status(nodes_failed, nodes_processed, errors)
-
-        result = ProcessingResult(
-            status=status,
-            message=f"Processed {nodes_processed} nodes ({nodes_failed} failed)",
-            items_processed=nodes_processed,
-            items_failed=nodes_failed,
-            errors=errors,
-        )
-
-        logger.info(f"[{self.name}] {result.message}")
-        return result
-
-    def _collect_node_operations(
-        self,
+    @staticmethod
+    def collect(
         node: Any,
         repo_id: str,
         embed_items: list[tuple[str, dict[str, Any], str]],
         graph_ops: list[tuple[str, dict[str, Any]]],
     ) -> bool:
-        """Collect embedding items and graph operations for a single node.
-
-        Returns True if the node was successfully collected, False otherwise.
-        """
-        if node.type == "definition":
-            qdrant_id = str(uuid.uuid4())
-            embed_items.append(
-                (
-                    node.content,
-                    {
-                        "path": node.file_path,
-                        "repo_id": repo_id,
-                        "name": node.name,
-                        "type": node.kind,
-                    },
-                    qdrant_id,
-                )
-            )
-            graph_ops.append(
-                (
-                    _CREATE_CODE_NODE_CYPHER,
-                    {
-                        "repo_id": repo_id,
-                        "file_path": node.file_path,
-                        "name": node.name,
-                        "node_type": node.kind,
-                        "start_line": node.start_line,
-                        "end_line": node.end_line,
-                        "qdrant_id": qdrant_id,
-                    },
-                )
-            )
-        elif node.type == "import":
-            if is_stdlib_or_vendor(node.name):
-                logger.debug(f"[{self.name}] Skipping stdlib/vendor import: {node.name}")
-                return True  # Not a failure, just filtered
-            graph_ops.append(
-                (
-                    _CREATE_IMPORT_CYPHER,
-                    {
-                        "repo_id": repo_id,
-                        "file_path": node.file_path,
-                        "module_name": node.name,
-                    },
-                )
-            )
-        elif node.type == "call":
-            graph_ops.append(
-                (
-                    _CREATE_CALL_CYPHER,
-                    {
-                        "repo_id": repo_id,
-                        "file_path": node.file_path,
-                        "target_name": node.name,
-                    },
-                )
-            )
-        else:
-            logger.warning(f"[{self.name}] Unknown node type: {node.type}")
+        """Append ops for *node*. Returns False for unknown node types."""
+        handler = _NODE_HANDLERS.get(node.type)
+        if handler is None:
+            logger.warning("[Processing] Unknown node type: %s", node.type)
             return False
+        return handler(node, repo_id, embed_items, graph_ops)
+
+
+def _handle_definition(node, repo_id, embed_items, graph_ops) -> bool:
+    qdrant_id = make_block_id(repo_id, node.file_path, node.name, node.kind)
+    embed_items.append(
+        (
+            node.content,
+            {"path": node.file_path, "repo_id": repo_id, "name": node.name, "type": node.kind},
+            qdrant_id,
+        )
+    )
+    graph_ops.append(
+        (
+            _CREATE_CODE_NODE_CYPHER,
+            {
+                "repo_id": repo_id,
+                "file_path": node.file_path,
+                "name": node.name,
+                "node_type": node.kind,
+                "start_line": node.start_line,
+                "end_line": node.end_line,
+                "qdrant_id": qdrant_id,
+            },
+        )
+    )
+    return True
+
+
+def _handle_import(node, repo_id, _embed_items, graph_ops) -> bool:
+    if is_stdlib_or_vendor(node.name):
+        logger.debug("[Processing] Skipping stdlib/vendor import: %s", node.name)
         return True
+    graph_ops.append(
+        (
+            _CREATE_IMPORT_CYPHER,
+            {"repo_id": repo_id, "file_path": node.file_path, "module_name": node.name},
+        )
+    )
+    return True
 
-    def _determine_status(
-        self, nodes_failed: int, nodes_processed: int, errors: list[dict[str, str]]
-    ) -> ProcessingStatus:
-        """Determine overall processing status based on failure counts."""
-        if nodes_failed == 0 and not errors:
-            return ProcessingStatus.SUCCESS
-        elif nodes_processed > 0:
-            return ProcessingStatus.PARTIAL
-        else:
-            return ProcessingStatus.FAILED
 
-    async def _flush_batch(
-        self,
-        context: IngestionContext,
-        embed_items: list[tuple[str, dict[str, Any], str]],
-        graph_ops: list[tuple[str, dict[str, Any]]],
-    ) -> None:
-        """Flush a batch of embedding items and graph operations."""
-        if embed_items:
-            await context.vector_store.add_batch(embed_items)
+def _handle_call(node, repo_id, _embed_items, graph_ops) -> bool:
+    graph_ops.append(
+        (
+            _CREATE_CALL_CYPHER,
+            {"repo_id": repo_id, "file_path": node.file_path, "target_name": node.name},
+        )
+    )
+    return True
 
-        if graph_ops:
+
+_NODE_HANDLERS = {
+    "definition": _handle_definition,
+    "import": _handle_import,
+    "call": _handle_call,
+}
+
+
+# ---------------------------------------------------------------------------
+# Flush helpers
+# ---------------------------------------------------------------------------
+
+
+async def _flush_batch(
+    context: IngestionContext,
+    embed_items: list[tuple[str, dict[str, Any], str]],
+    graph_ops: list[tuple[str, dict[str, Any]]],
+) -> None:
+    """Flush embedding items and graph operations.
+
+    Embedding writes are concurrent (each add_batch owns its data).
+    Graph writes are serialized via ``context.graph_lock`` to avoid
+    Neo4j deadlocks from concurrent transactions touching the same nodes.
+    """
+    embed_task = None
+    if embed_items:
+        embed_task = asyncio.ensure_future(context.vector_store.add_batch(embed_items))
+    if graph_ops:
+        async with context.graph_lock:
             await asyncio.to_thread(context.graph_store.execute_batch, graph_ops)
+    if embed_task:
+        await embed_task
 
-    # ------------------------------------------------------------------
-    # Per-node code path (fallback / used by incremental sync)
-    # ------------------------------------------------------------------
 
-    async def _execute_per_node(self, context: IngestionContext) -> ProcessingResult:
-        """Process nodes one at a time via the processor registry."""
-        logger.info(f"[{self.name}] Processing {len(context.nodes)} nodes (per-node)")
+async def _flush_vector_buffer(context: IngestionContext) -> None:
+    """Flush the per-node vector buffer to the store in chunks."""
+    batch_size = getattr(context.vector_store, "_batch_size", 128)
+    if not isinstance(batch_size, int) or batch_size <= 0:
+        batch_size = 128
 
-        nodes_processed = 0
-        nodes_failed = 0
+    vectors = list(context.vector_buffer)
+    for start in range(0, len(vectors), batch_size):
+        batch = vectors[start : start + batch_size]
+        if batch:
+            await context.vector_store.add_batch(batch)
+
+    if hasattr(context.vector_store, "flush"):
+        await context.vector_store.flush()
+    context.vector_buffer.clear()
+
+
+# ---------------------------------------------------------------------------
+# ProcessingStage
+# ---------------------------------------------------------------------------
+
+
+class ProcessingStage:
+    """Fourth stage: process AST nodes via batched or per-node path."""
+
+    name = "Processing"
+
+    def __init__(self, registry: NodeProcessorRegistry):
+        self.registry = registry
+
+    async def execute(self, context: IngestionContext) -> ProcessingResult:
+        """Process all extracted nodes."""
+        if context.config.get("batch_processing", True):
+            return await self._execute_batched(context)
+        return await self._execute_per_node(context)
+
+    # -- Batched path ------------------------------------------------------
+
+    async def _execute_batched(self, context: IngestionContext) -> ProcessingResult:
+        """Process nodes in batches for high-throughput graph + vector writes."""
+        logger.info("[%s] Processing %d nodes (batched)", self.name, len(context.nodes))
+
+        batch_size: int = context.config.get("processing_batch_size", DEFAULT_BATCH_SIZE)
+        embed_items: list[tuple[str, dict[str, Any], str]] = []
+        graph_ops: list[tuple[str, dict[str, Any]]] = []
+        processed, failed = 0, 0
         errors: list[dict[str, str]] = []
 
         for node in context.nodes:
-            node_data = {
-                "type": node.type,
-                "kind": node.kind,
-                "name": node.name,
-                "content": node.content,
-                "start_line": node.start_line,
-                "end_line": node.end_line,
-                "file_path": node.file_path,
-            }
-
-            result = self.registry.process(node_data, context)
-
-            if result.is_success:
-                nodes_processed += 1
-            else:
-                nodes_failed += 1
-                errors.extend(result.errors)
-
-        # Determine overall status
-        if nodes_failed == 0:
-            status = ProcessingStatus.SUCCESS
-        elif nodes_processed > 0:
-            status = ProcessingStatus.PARTIAL
-        else:
-            status = ProcessingStatus.FAILED
-
-        # Flush vector buffer (used by per-node processors)
-        if context.vector_buffer:
-            logger.info(f"[{self.name}] Flushing {len(context.vector_buffer)} vectors to store...")
             try:
-                await self._flush_vector_buffer(context)
-
-            except Exception as e:
-                logger.error(f"[{self.name}] Failed to flush vector buffer: {e}")
-                errors.append({"context": "vector_flush", "error": f"Vector flush failed: {e}"})
-                # Adjust status if flush failed
-                if nodes_processed > 0:
-                    status = ProcessingStatus.PARTIAL
+                if _NodeCollector.collect(node, context.repo_id, embed_items, graph_ops):
+                    processed += 1
                 else:
-                    status = ProcessingStatus.FAILED
+                    failed += 1
+                    continue
 
-        result = ProcessingResult(
-            status=status,
-            message=f"Processed {nodes_processed} nodes ({nodes_failed} failed)",
-            items_processed=nodes_processed,
-            items_failed=nodes_failed,
-            errors=errors,
-        )
+                if len(graph_ops) >= batch_size:
+                    await _flush_batch(context, embed_items, graph_ops)
+                    embed_items, graph_ops = [], []
+            except Exception as exc:
+                failed += 1
+                errors.append({"context": f"{node.type} {node.name} in {node.file_path}", "error": str(exc)})
+                logger.error("[%s] Failed to collect node %s: %s", self.name, node.name, exc)
 
-        logger.info(f"[{self.name}] {result.message}")
+        if embed_items or graph_ops:
+            try:
+                await _flush_batch(context, embed_items, graph_ops)
+            except Exception as exc:
+                logger.error("[%s] Final batch flush failed: %s", self.name, exc)
+                errors.append({"context": "batch_flush", "error": str(exc)})
+
+        result = _build_result(processed, failed, errors)
+        logger.info("[%s] %s", self.name, result.message)
         return result
 
-    async def _flush_vector_buffer(self, context: IngestionContext) -> None:
-        """Flush the vector buffer to the store in chunks."""
-        batch_size = getattr(context.vector_store, "_batch_size", 128)
-        if not isinstance(batch_size, int) or batch_size <= 0:
-            batch_size = 128
+    # -- Streaming batch entry point ----------------------------------------
 
-        vectors = list(context.vector_buffer)
+    async def process_node_batch(
+        self,
+        nodes: list,
+        context: IngestionContext,
+    ) -> ProcessingResult:
+        """Process a single batch of nodes (used by the pipelined orchestrator).
 
-        for start in range(0, len(vectors), batch_size):
-            end = start + batch_size
-            batch = vectors[start:end]
-            if not batch:
-                continue
-            await context.vector_store.add_batch(batch)
+        Same logic as ``_execute_batched`` but for an externally supplied
+        node list rather than reading from ``context.nodes``.
+        """
+        batch_size: int = context.config.get("processing_batch_size", DEFAULT_BATCH_SIZE)
+        embed_items: list[tuple[str, dict[str, Any], str]] = []
+        graph_ops: list[tuple[str, dict[str, Any]]] = []
+        processed, failed = 0, 0
+        errors: list[dict[str, str]] = []
 
-        # Final flush to ensure persistence
-        if hasattr(context.vector_store, "flush"):
-            await context.vector_store.flush()
+        for node in nodes:
+            try:
+                if _NodeCollector.collect(node, context.repo_id, embed_items, graph_ops):
+                    processed += 1
+                else:
+                    failed += 1
+                    continue
 
-        context.vector_buffer.clear()
+                if len(graph_ops) >= batch_size:
+                    await _flush_batch(context, embed_items, graph_ops)
+                    embed_items, graph_ops = [], []
+            except Exception as exc:
+                failed += 1
+                errors.append({"context": f"{node.type} {node.name} in {node.file_path}", "error": str(exc)})
+                logger.error("[%s] Failed to collect node %s: %s", self.name, node.name, exc)
+
+        if embed_items or graph_ops:
+            try:
+                await _flush_batch(context, embed_items, graph_ops)
+            except Exception as exc:
+                logger.error("[%s] Batch flush failed: %s", self.name, exc)
+                errors.append({"context": "batch_flush", "error": str(exc)})
+
+        return _build_result(processed, failed, errors)
+
+    # -- Per-node path -----------------------------------------------------
+
+    async def _execute_per_node(self, context: IngestionContext) -> ProcessingResult:
+        """Process nodes one at a time via the processor registry."""
+        logger.info("[%s] Processing %d nodes (per-node)", self.name, len(context.nodes))
+
+        processed, failed = 0, 0
+        errors: list[dict[str, str]] = []
+
+        for node in context.nodes:
+            result = self.registry.process(_node_to_dict(node), context)
+            if result.is_success:
+                processed += 1
+            else:
+                failed += 1
+                errors.extend(result.errors)
+
+        if context.vector_buffer:
+            logger.info("[%s] Flushing %d vectors to store...", self.name, len(context.vector_buffer))
+            try:
+                await _flush_vector_buffer(context)
+            except Exception as exc:
+                logger.error("[%s] Failed to flush vector buffer: %s", self.name, exc)
+                errors.append({"context": "vector_flush", "error": f"Vector flush failed: {exc}"})
+
+        result = _build_result(processed, failed, errors)
+        logger.info("[%s] %s", self.name, result.message)
+        return result

@@ -64,9 +64,10 @@ def test_search_result_formatter():
         {"id": "2", "text": "another snippet", "score": 0.80, "metadata": {"path": "other.py"}},
     ]
 
+    # Graph node IDs are paths (matching Neo4j output)
     graph = {
-        "nodes": [{"id": "1", "name": "func"}],
-        "edges": [{"source": "1", "target": "dep", "type": "IMPORTS"}],
+        "nodes": [{"id": "file.py", "name": "func"}],
+        "edges": [{"source": "file.py", "target": "dep", "type": "IMPORTS"}],
     }
 
     context_data = [(results[0], graph)]

@@ -17,6 +17,8 @@ class Settings:
     # Populated from unified config at construction time
     QDRANT_HOST: str = "localhost"
     QDRANT_PORT: int = 6335
+    QDRANT_URL: str = ""
+    QDRANT_API_KEY: str = ""
     QDRANT_COLLECTION: str = "codebase"
     NEO4J_URI: str = "bolt://localhost:7687"
     NEO4J_USER: str | None = None
@@ -32,6 +34,8 @@ def _build_settings() -> Settings:
     return Settings(
         QDRANT_HOST=cfg.store.qdrant_host,
         QDRANT_PORT=cfg.store.qdrant_port,
+        QDRANT_URL=cfg.store.qdrant_url,
+        QDRANT_API_KEY=cfg.store.qdrant_api_key,
         QDRANT_COLLECTION=cfg.store.qdrant_collection,
         NEO4J_URI=cfg.store.neo4j_uri,
         NEO4J_USER=cfg.store.neo4j_user or None,

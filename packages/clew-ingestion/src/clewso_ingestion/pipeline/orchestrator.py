@@ -2,8 +2,11 @@
 Ingestion Pipeline Orchestrator
 
 Coordinates the execution of all pipeline stages.
-Supports both synchronous and asynchronous stages — async stages are
-detected via inspect.iscoroutinefunction(stage.execute) and awaited.
+
+Parsing and node-processing are pipelined: the parsing stage streams
+batches of parsed nodes via an async generator, and the processing
+stage consumes each batch as soon as it arrives.  This eliminates the
+idle window where processing waits for all files to be parsed first.
 """
 
 import asyncio
@@ -78,14 +81,23 @@ class IngestionPipeline:
         self.registry.register("import", ImportProcessor())
         self.registry.register("call", CallProcessor())
 
-        # Initialize pipeline stages
-        self.stages: list[PipelineStage | AsyncPipelineStage] = [
+        # Pipeline stages — split into phases for pipelined execution.
+        self._prep_stages: list[PipelineStage | AsyncPipelineStage] = [
             RepositoryPreparationStage(),
             FileDiscoveryStage(),
-            ParsingStage(),
-            SignatureExtractionStage(),
-            ProcessingStage(self.registry),
-            FinalizationStage(),
+        ]
+        self._parsing_stage = ParsingStage()
+        self._signature_stage = SignatureExtractionStage()
+        self._processing_stage = ProcessingStage(self.registry)
+        self._finalization_stage = FinalizationStage()
+
+        # Legacy list kept for backward-compat introspection.
+        self.stages: list[PipelineStage | AsyncPipelineStage] = [
+            *self._prep_stages,
+            self._parsing_stage,
+            self._signature_stage,
+            self._processing_stage,
+            self._finalization_stage,
         ]
 
     def run(self, repo_id: str, repo_path_or_url: str) -> ProcessingResult:
@@ -144,76 +156,155 @@ class IngestionPipeline:
                     logger.info(f"Updated last_indexed_commit to {head_sha[:8]}")
 
             return result
+        except KeyboardInterrupt:
+            logger.warning("Interrupted — flushing pending writes before exit")
+            raise
         finally:
-            pool.shutdown(wait=True)
+            # Flush any buffered vector writes before closing connections.
+            if hasattr(self.vector_store, "flush"):
+                try:
+                    await self.vector_store.flush()
+                except Exception as e:
+                    logger.warning("Failed to flush vector store on shutdown: %s", e)
+            pool.shutdown(wait=False)
+            if hasattr(self.graph_store, "close"):
+                self.graph_store.close()
 
     async def _execute_stages(self, context: IngestionContext) -> ProcessingResult:
-        """
-        Execute all pipeline stages sequentially.
+        """Execute pipeline stages with pipelined parsing → processing.
 
-        Async stages are awaited; sync stages are called directly.
-
-        Args:
-            context: The shared ingestion context
-
-        Returns:
-            Aggregated ProcessingResult
+        Prep stages run first (repo clone, file discovery).  Then parsing
+        streams node batches via an async generator and each batch is
+        handed to the processing stage immediately — no waiting for all
+        files to finish.  Signature extraction and finalization run after
+        the stream is exhausted.
         """
         overall_errors: list[dict[str, str]] = []
         stage_results: list[ProcessingResult] = []
 
-        for stage in self.stages:
-            try:
-                logger.info(f"Executing stage: {stage.name}")
+        # --- Phase 1: preparation stages (sync or async) -----------------
+        for stage in self._prep_stages:
+            result = await self._run_stage(stage, context)
+            stage_results.append(result)
+            overall_errors.extend(result.errors)
+            if result.status == ProcessingStatus.FAILED:
+                return self._aggregate(stage_results, overall_errors)
 
-                if inspect.iscoroutinefunction(stage.execute):
-                    result = await stage.execute(context)
-                else:
-                    result = stage.execute(context)
+        # --- Phase 2: pipelined parsing → processing ----------------------
+        # Node batches from parsing are processed concurrently (bounded by
+        # a semaphore) so multiple OpenAI embedding requests are in-flight
+        # at once.  Graph writes within _flush_batch are already serialized
+        # per batch via asyncio.to_thread.
+        max_concurrent = context.config.get("max_concurrent_batches", 8)
+        sem = asyncio.Semaphore(max_concurrent)
 
-                # cast: pyright can't narrow through inspect.iscoroutinefunction
-                typed_result = cast(ProcessingResult, result)
+        logger.info(
+            "Starting pipelined parsing → processing (concurrency=%d)",
+            max_concurrent,
+        )
+        parse_processed, parse_failed = 0, 0
+        proc_processed, proc_failed = 0, 0
+        parse_errors: list[dict[str, str]] = []
+        proc_errors: list[dict[str, str]] = []
+        inflight: list[asyncio.Task[ProcessingResult]] = []
 
-                stage_results.append(typed_result)
+        async def _process_batch(batch: list) -> ProcessingResult:
+            async with sem:
+                return await self._processing_stage.process_node_batch(batch, context)
 
-                if typed_result.errors:
-                    overall_errors.extend(typed_result.errors)
+        async for node_batch in self._parsing_stage.stream_nodes(context):
+            parse_processed += len(node_batch)
+            inflight.append(asyncio.create_task(_process_batch(node_batch)))
 
-                if typed_result.status == ProcessingStatus.FAILED:
-                    logger.error(f"Stage {stage.name} failed: {typed_result.message}")
+        # Await all in-flight processing tasks
+        for proc_result in await asyncio.gather(*inflight, return_exceptions=True):
+            if isinstance(proc_result, BaseException):
+                proc_failed += 1
+                proc_errors.append({"context": "batch_processing", "error": str(proc_result)})
+                logger.error("Batch processing failed: %s", proc_result)
+            else:
+                proc_processed += proc_result.items_processed
+                proc_failed += proc_result.items_failed
+                proc_errors.extend(proc_result.errors)
 
-            except Exception as e:
-                error_msg = f"Stage {stage.name} raised exception: {str(e)}"
-                logger.error(error_msg, exc_info=True)
-                overall_errors.append({"context": stage.name, "error": str(e)})
-                raise StageError(stage.name, str(e)) from e
+        # Build synthetic results for the parsing and processing stages
+        parse_result = ProcessingResult(
+            status=ProcessingStatus.SUCCESS if parse_failed == 0 else ProcessingStatus.PARTIAL,
+            message=f"Parsed {len(context.files)} files, streamed {parse_processed} nodes",
+            items_processed=len(context.files),
+            items_failed=parse_failed,
+            errors=parse_errors,
+        )
+        stage_results.append(parse_result)
+        overall_errors.extend(parse_errors)
 
-        # Determine overall status
-        failed_stages = sum(1 for r in stage_results if r.status == ProcessingStatus.FAILED)
-        partial_stages = sum(1 for r in stage_results if r.status == ProcessingStatus.PARTIAL)
+        proc_status = ProcessingStatus.SUCCESS
+        if proc_failed > 0 and proc_processed > 0:
+            proc_status = ProcessingStatus.PARTIAL
+        elif proc_failed > 0:
+            proc_status = ProcessingStatus.FAILED
+        proc_result_agg = ProcessingResult(
+            status=proc_status,
+            message=f"Processed {proc_processed} nodes ({proc_failed} failed)",
+            items_processed=proc_processed,
+            items_failed=proc_failed,
+            errors=proc_errors,
+        )
+        stage_results.append(proc_result_agg)
+        overall_errors.extend(proc_errors)
 
-        if failed_stages > 0:
+        # --- Phase 3: signature extraction + finalization -----------------
+        for stage in [self._signature_stage, self._finalization_stage]:
+            result = await self._run_stage(stage, context)
+            stage_results.append(result)
+            overall_errors.extend(result.errors)
+
+        return self._aggregate(stage_results, overall_errors)
+
+    async def _run_stage(
+        self, stage: PipelineStage | AsyncPipelineStage, context: IngestionContext
+    ) -> ProcessingResult:
+        """Run a single stage, handling both sync and async execute methods."""
+        try:
+            logger.info(f"Executing stage: {stage.name}")
+            if inspect.iscoroutinefunction(stage.execute):
+                result = await stage.execute(context)
+            else:
+                result = stage.execute(context)
+            typed = cast(ProcessingResult, result)
+            if typed.status == ProcessingStatus.FAILED:
+                logger.error(f"Stage {stage.name} failed: {typed.message}")
+            return typed
+        except Exception as e:
+            logger.error(f"Stage {stage.name} raised exception: {e}", exc_info=True)
+            raise StageError(stage.name, str(e)) from e
+
+    @staticmethod
+    def _aggregate(results: list[ProcessingResult], errors: list[dict[str, str]]) -> ProcessingResult:
+        """Build an aggregate ProcessingResult from stage results."""
+        failed = sum(1 for r in results if r.status == ProcessingStatus.FAILED)
+        partial = sum(1 for r in results if r.status == ProcessingStatus.PARTIAL)
+
+        if failed > 0:
             status = ProcessingStatus.FAILED
-        elif partial_stages > 0:
+        elif partial > 0:
             status = ProcessingStatus.PARTIAL
         else:
             status = ProcessingStatus.SUCCESS
 
-        total_processed = sum(r.items_processed for r in stage_results)
-        total_failed = sum(r.items_failed for r in stage_results)
+        total_processed = sum(r.items_processed for r in results)
+        total_failed = sum(r.items_failed for r in results)
 
-        final_result = ProcessingResult(
+        final = ProcessingResult(
             status=status,
             message=f"Pipeline completed: {total_processed} items processed, {total_failed} failed",
             items_processed=total_processed,
             items_failed=total_failed,
-            errors=overall_errors,
-            metadata={"stage_results": [r.message for r in stage_results]},
+            errors=errors,
+            metadata={"stage_results": [r.message for r in results]},
         )
-
-        logger.info(f"Pipeline finished: {final_result.message}")
-
-        return final_result
+        logger.info(f"Pipeline finished: {final.message}")
+        return final
 
     def _create_context(self, repo_id: str, repo_path_or_url: str) -> IngestionContext:
         """

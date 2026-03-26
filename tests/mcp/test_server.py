@@ -35,17 +35,16 @@ class TestMCPServer:
             return_value=httpx.Response(
                 200,
                 json={
-                    "nodes": [{"id": "node1", "name": "test_func"}],
-                    "edges": [{"source": "caller", "target": "node1", "type": "CALLS"}],
+                    "nodes": [{"id": "test.py", "name": "test_func"}],
+                    "edges": [{"source": "caller", "target": "test.py", "type": "CALLS"}],
                 },
             )
         )
 
         with patch.dict(os.environ, {"CLEW_API_KEY": "test_key"}):
             result = await search_codebase("authentication")
-            assert "node1" in result
-            assert "0.95" in result
             assert "test.py" in result
+            assert "0.95" in result
             assert "Used By:" in result
             assert "caller -> CALLS" in result
 
@@ -61,13 +60,13 @@ class TestMCPServer:
             )
         )
 
-        # 2. Mock Traverse
+        # 2. Mock Traverse (node IDs are paths, matching Neo4j output)
         respx.post("http://localhost:8000/v1/graph/traverse").mock(
             return_value=httpx.Response(
                 200,
                 json={
-                    "nodes": [{"id": "node1", "name": "app.py"}],
-                    "edges": [{"source": "node1", "target": "dep1", "type": "IMPORTS"}],
+                    "nodes": [{"id": "src/app.py", "name": "app.py"}],
+                    "edges": [{"source": "src/app.py", "target": "dep1", "type": "IMPORTS"}],
                 },
             )
         )

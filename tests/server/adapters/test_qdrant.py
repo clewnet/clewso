@@ -76,8 +76,8 @@ async def test_search_with_filters(store, mock_qdrant_client):
     must = query_filter.must
     assert len(must) == 4  # repo + 3 filters
 
-    # Check repo filter
-    repo_cond = next(c for c in must if c.key == "repo")
+    # Check repo filter (payload field is repo_id)
+    repo_cond = next(c for c in must if c.key == "repo_id")
     assert repo_cond.match.value == "my/repo"
 
     # Check path filter

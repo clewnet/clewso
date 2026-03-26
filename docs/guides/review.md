@@ -4,11 +4,27 @@ Clewso's smart review analyzes code changes using the indexed dependency graph t
 
 ## How it works
 
-1. **Parse diff** — extracts changed files from `git diff`
-2. **Impact graph** — queries Neo4j for reverse dependencies (who imports/calls the changed file)
-3. **Context fetch** — reads source of impacted files within a token budget
-4. **LLM analysis** — sends diff + context to an LLM for risk assessment
-5. **Policy check** — validates against server-side policies (banned imports, protected paths)
+1. **Parse diff** — extracts changed files from `git diff` (lockfiles are skipped automatically)
+2. **Impact graph** — queries Neo4j directly for reverse dependencies: files that import modules from, or call functions defined in, the changed file
+3. **Same-diff detection** — marks downstream consumers that are also modified or deleted in this diff
+4. **Package context** — checks workspace membership and greps for removed public symbols to assess external-consumer risk
+5. **Context fetch** — reads source of impacted files (falls back to `git show HEAD` for deleted files)
+6. **LLM analysis** — sends diff + consumer list + context + analysis notes to an LLM for risk assessment
+7. **Policy check** — validates against server-side policies (banned imports, protected paths)
+
+## Risk levels
+
+- **HIGH** — definite breaking change (missing symbol, deleted file with live consumers)
+- **MEDIUM** — likely breaking change (signature mismatch, type change)
+- **LOW** — possible issue (style change, deprecation)
+- **SAFE** — no breaking changes detected
+
+The review automatically reduces risk when:
+
+- A downstream consumer is **co-changed** in the same diff and the change addresses the breakage
+- A file and **all its consumers are deleted** together (coordinated teardown)
+- A removed public API has **zero remaining references** in the codebase
+- The crate/package is **workspace-internal** with no external consumers
 
 ## Usage
 
@@ -40,7 +56,9 @@ Exits with code 1 if blocking policy violations are found. Use in pre-commit hoo
 
 | Variable | Default | Description |
 |---|---|---|
-| `CLEW_API_URL` | `http://localhost:8000/v1` | API base URL |
-| `CLEW_API_KEY` | — | API key (for platform mode) |
 | `OPENAI_API_KEY` | — | Required for LLM analysis |
-| `OPENAI_MODEL` | `gpt-4-turbo-preview` | LLM model to use |
+| `OPENAI_MODEL` | `gpt-4-turbo-preview` | LLM model for risk assessment |
+| `OPENAI_API_BASE` | `https://api.openai.com/v1` | Custom OpenAI-compatible endpoint |
+| `CLEW_API_KEY` | — | API key (only for platform mode policy checks) |
+
+Neo4j and Qdrant connections are read from `~/.config/clewso/config.toml` or the standard store environment variables (see [Indexing](indexing.md#configuration)).

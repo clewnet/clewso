@@ -33,12 +33,14 @@ class TestMakeVectorId:
         b = make_vector_id("owner/repo-b", "src/foo.py")
         assert a != b
 
-    def test_returns_64_char_hex(self):
+    def test_returns_valid_uuid(self):
+        import uuid
+
         from clewso_ingestion.pipeline.ids import make_vector_id
 
         id_ = make_vector_id("owner/repo", "src/foo.py")
-        assert len(id_) == 64
-        assert all(c in "0123456789abcdef" for c in id_)
+        parsed = uuid.UUID(id_)
+        assert str(parsed) == id_
 
 
 # ---------------------------------------------------------------------------

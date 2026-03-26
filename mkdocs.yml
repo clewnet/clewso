@@ -51,3 +51,5 @@ nav:
       - Search: api/search.md
       - Graph: api/graph.md
       - Policies: api/policies.md
+  - Blog:
+      - "What Line-Level Tools Miss": blog/dependency-aware-review.md

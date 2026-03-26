@@ -8,10 +8,16 @@ logger = logging.getLogger(__name__)
 
 
 class GraphStore:
-    def __init__(self):
-        uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
-        user = os.getenv("NEO4J_USER", "neo4j")
-        password = os.getenv("NEO4J_PASSWORD", "password")
+    def __init__(
+        self,
+        *,
+        uri: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
+    ):
+        uri = uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        user = user or os.getenv("NEO4J_USER", "neo4j")
+        password = password or os.getenv("NEO4J_PASSWORD", "password")
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
         self._ensure_schema()
 
@@ -47,12 +53,17 @@ class GraphStore:
                 """)
                 logger.debug("Created constraint: file_repo_path_unique")
 
-                # Constraint 2: CodeBlock uniqueness on (repo_id, file_path, name)
+                # Constraint 2: CodeBlock uniqueness on (repo_id, file_path, name, type)
+                # Migration: drop the old 3-property constraint if it exists
+                try:
+                    session.run("DROP CONSTRAINT codeblock_unique IF EXISTS")
+                except Exception:
+                    pass  # Already dropped or never existed
                 session.run("""
-                    CREATE CONSTRAINT codeblock_unique IF NOT EXISTS
-                    FOR (c:CodeBlock) REQUIRE (c.repo_id, c.file_path, c.name) IS UNIQUE
+                    CREATE CONSTRAINT codeblock_unique_v2 IF NOT EXISTS
+                    FOR (c:CodeBlock) REQUIRE (c.repo_id, c.file_path, c.name, c.type) IS UNIQUE
                 """)
-                logger.debug("Created constraint: codeblock_unique")
+                logger.debug("Created constraint: codeblock_unique_v2")
 
                 # Index 1: File repo_id for filtering
                 session.run("""
@@ -328,3 +339,10 @@ class GraphStore:
             )
 
             return deleted_count
+
+
+# Protocol conformance check
+def _check_graph_writer_protocol() -> None:
+    from clewso_core.protocols import GraphWriter
+
+    assert isinstance(GraphStore(uri="bolt://fake", user="x", password="x"), GraphWriter)  # type: ignore[abstract]

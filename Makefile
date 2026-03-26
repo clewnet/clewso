@@ -24,33 +24,33 @@ logs:
 	docker-compose logs -f
 
 lint:
-	uv run ruff check .
+	uv run --frozen ruff check .
 	$(MAKE) typecheck
 
 typecheck:
 	@echo "🔍 Pyright: clew-core (strict)"
-	cd packages/clew-core && uv run pyright || exit 1
+	cd packages/clew-core && uv run --frozen pyright || exit 1
 	@echo "🔍 Pyright: clew-ingestion (standard)"
-	cd packages/clew-ingestion && uv run pyright || exit 1
+	cd packages/clew-ingestion && uv run --frozen pyright || exit 1
 
 format:
-	uv run ruff format .
+	uv run --frozen ruff format .
 
 test:
 	@echo "📦 Testing: clewso (root + server + mcp)"
-	uv run pytest tests/ --ignore=tests/bench --ignore=tests/quality --ignore=tests/e2e || exit 1
+	uv run --frozen pytest tests/ --ignore=tests/bench --ignore=tests/quality --ignore=tests/e2e || exit 1
 	@echo "📦 Testing: clew-ingestion"
-	cd packages/clew-ingestion && uv run pytest || exit 1
+	cd packages/clew-ingestion && uv run --frozen pytest || exit 1
 	@echo "📦 Testing: clew-core"
-	cd packages/clew-core && uv run pytest || exit 1
+	cd packages/clew-core && uv run --frozen pytest || exit 1
 
 test-pre-push:
 	@echo "📦 Testing: clewso (root + server + mcp)"
-	uv run pytest tests/ --ignore=tests/bench --ignore=tests/quality --ignore=tests/e2e || exit 1
+	uv run --frozen pytest tests/ --ignore=tests/bench --ignore=tests/quality --ignore=tests/e2e || exit 1
 	@echo "📦 Testing: clew-ingestion (unit only)"
-	cd packages/clew-ingestion && uv run pytest --ignore=tests/test_embeddings.py --ignore=tests/test_ingest.py || exit 1
+	cd packages/clew-ingestion && uv run --frozen pytest --ignore=tests/test_embeddings.py --ignore=tests/test_ingest.py || exit 1
 	@echo "📦 Testing: clew-core"
-	cd packages/clew-core && uv run pytest || exit 1
+	cd packages/clew-core && uv run --frozen pytest || exit 1
 
 clean:
 	docker-compose down -v

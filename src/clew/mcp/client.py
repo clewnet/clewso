@@ -117,7 +117,7 @@ class ClewAPIClient:
         """
         search_data: dict[str, Any] = {"query": query, "limit": limit}
         if repo_id:
-            search_data["repo_id"] = repo_id
+            search_data["repo"] = repo_id
         if filters:
             search_data["filters"] = filters
 

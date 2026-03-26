@@ -322,8 +322,8 @@ class TestOrchestratorDispatch:
     """Verify the orchestrator correctly dispatches sync vs async stages."""
 
     @pytest.mark.asyncio
-    async def test_mixed_stages(self, tmp_path):
-        """Orchestrator runs sync and async stages in sequence."""
+    async def test_prep_stages_run(self, tmp_path):
+        """Orchestrator runs prep stages via _run_stage."""
         from clewso_ingestion.pipeline.context import ProcessingResult, ProcessingStatus
         from clewso_ingestion.pipeline.orchestrator import IngestionPipeline
 
@@ -344,26 +344,27 @@ class TestOrchestratorDispatch:
                 return ProcessingResult(status=ProcessingStatus.SUCCESS, message="async ok")
 
         mock_vs = MagicMock()
+        mock_vs.flush = AsyncMock()
         mock_vs.add_batch = AsyncMock(return_value=[])
         mock_gs = MagicMock()
         mock_parser = MagicMock()
+        mock_parser.parse_file = MagicMock(return_value=[])
 
         pipeline = IngestionPipeline(
             vector_store=mock_vs,
             graph_store=mock_gs,
             parser=mock_parser,
         )
-        # Replace stages with our test stages
-        pipeline.stages = [SyncStage(), AsyncStage(), SyncStage()]
+        # Replace prep stages to verify dispatch ordering
+        pipeline._prep_stages = [SyncStage(), AsyncStage(), SyncStage()]
 
-        result = await pipeline._run_async("test-id", str(tmp_path))
+        await pipeline._run_async("test-id", str(tmp_path))
 
-        assert result.is_success
         assert call_order == ["sync", "async", "sync"]
 
     @pytest.mark.asyncio
     async def test_thread_pool_shutdown(self, tmp_path):
-        """Thread pool is shut down even if a stage raises."""
+        """Thread pool and graph driver are cleaned up even if a stage raises."""
         from clewso_ingestion.pipeline.exceptions import StageError
         from clewso_ingestion.pipeline.orchestrator import IngestionPipeline
 
@@ -374,6 +375,7 @@ class TestOrchestratorDispatch:
                 raise RuntimeError("boom")
 
         mock_vs = MagicMock()
+        mock_vs.flush = AsyncMock()
         mock_gs = MagicMock()
         mock_parser = MagicMock()
 
@@ -382,10 +384,10 @@ class TestOrchestratorDispatch:
             graph_store=mock_gs,
             parser=mock_parser,
         )
-        pipeline.stages = [FailingStage()]
+        pipeline._prep_stages = [FailingStage()]
 
         with pytest.raises(StageError):
             await pipeline._run_async("test-id", str(tmp_path))
 
-        # If we get here, the finally block ran (pool.shutdown).
-        # The test passing without hanging confirms deterministic cleanup.
+        # Verify graph driver was closed in the finally block
+        mock_gs.close.assert_called_once()

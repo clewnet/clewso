@@ -2,7 +2,7 @@
 
 # Import all adapters to trigger auto-registration
 # The imports above already do this, but we're explicit here
-from . import neo4j, noop_graph, pgvector, qdrant  # noqa: F401
+from . import ladybug, neo4j, noop_graph, pgvector, qdrant  # noqa: F401
 from .base import (
     EmbeddingProvider,
     GraphEdge,
@@ -18,6 +18,7 @@ from .embeddings import (
     OpenAIEmbeddings,
     get_embedding_provider,
 )
+from .ladybug import LadybugUnifiedStore
 from .neo4j import Neo4jStore
 from .noop_graph import NoOpGraphStore
 from .pgvector import PgVectorStore
@@ -47,6 +48,7 @@ __all__ = [
     # Graph Store Implementations
     "Neo4jStore",
     "NoOpGraphStore",
+    "LadybugUnifiedStore",
     # Embedding Implementations
     "OpenAIEmbeddings",
     "OllamaEmbeddings",

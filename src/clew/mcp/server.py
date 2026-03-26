@@ -74,19 +74,18 @@ async def search_codebase(query: str, limit: int = 5, repo_id: str | None = None
         context_data = []
 
         for result in top_results:
-            node_id = result.get("id")
-            if not node_id:
+            node_path = result.get("metadata", {}).get("path")
+            if not node_path:
                 context_data.append((result, {}))
                 continue
-            node_id = str(node_id)
             try:
                 graph = await client.traverse(
-                    node_id,
+                    node_path,
                     relationship_types=["CALLS", "IMPORTS", "DEFINES", "CONTAINS"],
                 )
                 context_data.append((result, graph))
             except Exception as e:
-                logger.warning(f"Could not fetch context for {node_id}: {e}")
+                logger.warning(f"Could not fetch context for {node_path}: {e}")
                 context_data.append((result, {}))
 
         # 3. Format and return
@@ -119,18 +118,16 @@ async def explore_module(path: str, repo_id: str | None = None) -> str:
             return f"Could not find module matching '{path}'"
 
         node = results[0]
-        node_id = node.get("id")
         found_path = node.get("metadata", {}).get("path", "unknown")
 
-        if not node_id:
-            return f"Could not determine node ID for '{path}'"
-        node_id = str(node_id)
+        if found_path == "unknown":
+            return f"Could not determine file path for '{path}'"
 
         # 2. Traverse graph from this module
-        graph = await client.traverse(node_id, relationship_types=["IMPORTS", "DEFINES", "CALLS", "CONTAINS"])
+        graph = await client.traverse(found_path, relationship_types=["IMPORTS", "DEFINES", "CALLS", "CONTAINS"])
 
         # 3. Format and return
-        return ModuleAnalysisFormatter.format_module_analysis(str(found_path), graph, node_id)
+        return ModuleAnalysisFormatter.format_module_analysis(str(found_path), graph, found_path)
 
 
 @mcp.tool()

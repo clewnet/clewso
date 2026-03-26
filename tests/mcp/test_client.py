@@ -63,7 +63,7 @@ async def test_client_search(monkeypatch):
         assert call_args[0][0] == "/v1/search/"
         assert call_args[1]["json"]["query"] == "test query"
         assert call_args[1]["json"]["limit"] == 5
-        assert call_args[1]["json"]["repo_id"] == "myrepo"
+        assert call_args[1]["json"]["repo"] == "myrepo"
 
         # Verify results
         assert len(results) == 1

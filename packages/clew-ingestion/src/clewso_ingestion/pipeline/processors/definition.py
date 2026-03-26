@@ -40,10 +40,10 @@ class DefinitionProcessor:
         file_path = node_data.get("file_path", "")
 
         try:
-            import uuid
+            from ..ids import make_block_id
 
-            # Pre-generate ID so we can link in graph immediately
-            block_qdrant_id = str(uuid.uuid4())
+            # Deterministic ID matching the Neo4j MERGE key
+            block_qdrant_id = make_block_id(context.repo_id, file_path, name, kind)
 
             context.vector_buffer.append(
                 (

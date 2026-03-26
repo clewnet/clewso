@@ -46,7 +46,7 @@ class ClewAPIClient:
         base_url = base_url or os.getenv("CLEW_API_URL", "http://localhost:8000/v1")
         if base_url is None:
             base_url = "http://localhost:8000/v1"
-        self.base_url = base_url.rstrip("/")
+        self.base_url = base_url.rstrip("/") + "/"
         self.api_key = api_key or os.getenv("CLEW_API_KEY")
 
         # Parse timeout from env
@@ -119,7 +119,7 @@ class ClewAPIClient:
             search_data["filters"] = filters
 
         logger.info(f"Searching: {search_data}")
-        response = await self.client.post("/search", json=search_data)
+        response = await self.client.post("search", json=search_data)
         response.raise_for_status()
 
         # Handle different response formats (list vs dict)
@@ -154,7 +154,7 @@ class ClewAPIClient:
             traverse_data["relationship_types"] = relationship_types
 
         logger.debug(f"Traversing from {start_node_id}")
-        response = await self.client.post("/graph/traverse", json=traverse_data)
+        response = await self.client.post("graph/traverse", json=traverse_data)
         response.raise_for_status()
 
         return response.json()

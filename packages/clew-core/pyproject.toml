@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "clewso-core"
-version = "0.1.6"
+version = "0.1.8"
 description = "Shared core library for Clew Engine packages"
 requires-python = ">=3.11"
 dependencies = [

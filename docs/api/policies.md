@@ -1,6 +1,6 @@
 # Policies API
 
-## `GET /v1/policies`
+## `GET /v1/policies/`
 
 Fetch active policy rules for code review enforcement.
 
@@ -14,20 +14,39 @@ Fetch active policy rules for code review enforcement.
       "type": "banned_import",
       "pattern": "eval",
       "severity": "block",
-      "message": "Use of eval() is prohibited"
-    },
-    {
-      "id": "protect-auth",
-      "type": "protected_write",
-      "pattern": "src/auth/**",
-      "severity": "warn",
-      "message": "Changes to auth require security review"
+      "message": "Use of eval() is prohibited",
+      "precept_id": null
     }
   ]
 }
 ```
 
-### Policy types
+## `POST /v1/policies/`
+
+Create a new policy rule.
+
+### Request
+
+```json
+{
+  "type": "banned_import",
+  "pattern": "eval",
+  "severity": "block",
+  "message": "Use of eval() is prohibited"
+}
+```
+
+## `GET /v1/policies/export`
+
+Export all policies as a flat list (for caching in hooks/CI).
+
+## `DELETE /v1/policies/{policy_id}`
+
+Delete a policy by ID.
+
+---
+
+## Policy types
 
 | Type | Description |
 |---|---|
@@ -35,7 +54,7 @@ Fetch active policy rules for code review enforcement.
 | `protected_write` | Warns/blocks when matching file paths are modified |
 | `unguarded_path` | Warns/blocks when matching file paths are modified without guard |
 
-### Severity levels
+## Severity levels
 
 | Severity | Effect |
 |---|---|

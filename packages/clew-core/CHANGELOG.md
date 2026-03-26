@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.8](https://github.com/matchdav/clew-engine/compare/clewso-core-v0.1.7...clewso-core-v0.1.8) (2026-03-26)
+
+
+### Features
+
+* **ladybug:** integration of embedded db ([e84898d](https://github.com/matchdav/clew-engine/commit/e84898da24c133254eaaace448370e9c7c9677cc))
+
+## [0.1.7](https://github.com/matchdav/clew-engine/compare/clewso-core-v0.1.6...clewso-core-v0.1.7) (2026-03-20)
+
+
+### Miscellaneous Chores
+
+* **clewso-core:** Synchronize clewso versions
+
 ## [0.1.6](https://github.com/matchdav/clew-engine/compare/clewso-core-v0.1.5...clewso-core-v0.1.6) (2026-03-19)
 
 

@@ -109,7 +109,7 @@ class PgVectorStore:
 
         # Add repo filter if provided
         if repo:
-            query += " WHERE metadata->>'repo' = $2"
+            query += " WHERE metadata->>'repo_id' = $2"
             params.append(repo)
 
         query += f" ORDER BY embedding <=> $1::vector LIMIT {limit}"

@@ -5,6 +5,7 @@ These classes encapsulate data that flows between pipeline stages,
 ensuring clean separation of concerns and testability.
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -174,6 +175,7 @@ class IngestionContext:
     parser: Any = None  # Will be CodeParser instance
     config: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
+    graph_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     @property
     def is_local_repo(self) -> bool:

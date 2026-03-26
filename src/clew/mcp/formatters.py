@@ -127,16 +127,15 @@ class SearchResultFormatter:
             metadata = result.get("metadata", {})
             path = metadata.get("path", "unknown")
             score = result.get("score", 0.0)
-            node_id = result.get("id", "unknown")
             text = result.get("text", "")
 
-            lines.append(f"--- MATCH {i + 1}: {node_id} (Score: {score:.2f}) ---")
+            lines.append(f"--- MATCH {i + 1}: {path} (Score: {score:.2f}) ---")
             lines.append(f"File: {path}")
             lines.append(f"Snippet:\n{text[:300]}...\n")
 
             # Add context if available
             if graph:
-                incoming, outgoing = GraphFormatter.format_graph_context(graph, node_id)
+                incoming, outgoing = GraphFormatter.format_graph_context(graph, path)
 
                 if incoming:
                     lines.append("Used By:")

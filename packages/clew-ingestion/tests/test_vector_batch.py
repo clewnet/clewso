@@ -102,21 +102,12 @@ class TestVectorStoreBatching:
         point_ids = await vector_store.add_batch([("text1", {"meta": "1"}, None), ("text2", {"meta": "2"}, None)])
 
         assert len(point_ids) == 2
-        assert len(vector_store._buffer) == 2
-
-        # Robust payload verification (set-based to handle ordering)
-        texts = {point.payload["text"] for point in vector_store._buffer}
-        assert texts == {"text1", "text2"}
 
         # Verify embeddings were called
         mock_provider.embed_batch.assert_awaited_once()
 
-        await vector_store.flush()
-
-        assert len(vector_store._buffer) == 0
+        # add_batch upserts directly (concurrency-safe, no shared buffer)
         vector_store.client.upsert.assert_called_once()
-
-        # Verify arguments passed to upsert
         call_kwargs = vector_store.client.upsert.call_args.kwargs
         points = call_kwargs.get("points")
         assert len(points) == 2
@@ -228,6 +219,9 @@ class TestVectorStoreAddBatch:
         ids = await vector_store.add_batch(items)
 
         assert ids == ["custom-id-1", "custom-id-2"]
-        assert len(vector_store._buffer) == 2
-        assert vector_store._buffer[0].id == "custom-id-1"
-        assert vector_store._buffer[1].id == "custom-id-2"
+
+        # add_batch upserts directly — verify via the client mock
+        call_kwargs = vector_store.client.upsert.call_args.kwargs
+        points = call_kwargs.get("points")
+        assert points[0].id == "custom-id-1"
+        assert points[1].id == "custom-id-2"

@@ -24,7 +24,7 @@ CONFIG_FILE = CONFIG_DIR / "config.toml"
 class APIConfig:
     """Connection to the Clewso API server."""
 
-    url: str = "http://localhost:8000"
+    url: str = "http://localhost:8000/v1"
     key: str = ""
     timeout: float = 30.0
 
@@ -45,15 +45,18 @@ class EmbeddingsConfig:
 
 @dataclass
 class StoreConfig:
-    """Backing store connections (Qdrant, Neo4j, Postgres)."""
+    """Backing store connections (Qdrant, Neo4j, Postgres, LadybugDB)."""
 
     qdrant_host: str = "localhost"
     qdrant_port: int = 6335
+    qdrant_url: str = ""  # Full URL (e.g. Qdrant Cloud); takes precedence over host/port
+    qdrant_api_key: str = ""
     qdrant_collection: str = "codebase"
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_user: str = "neo4j"
     neo4j_password: str = "password"
     postgres_uri: str = ""
+    ladybug_path: str = "~/.local/share/clewso/graph/"
 
 
 @dataclass
@@ -62,8 +65,8 @@ class ServerConfig:
 
     host: str = "0.0.0.0"
     port: int = 8000
-    vector_adapter: str = "qdrant"  # qdrant | pgvector
-    graph_adapter: str = "neo4j"  # neo4j | noop
+    vector_adapter: str = "ladybug"  # ladybug | qdrant | pgvector
+    graph_adapter: str = "ladybug"  # ladybug | neo4j | noop
     rerank_enabled: bool = False
     rerank_model: str = "BAAI/bge-reranker-v2-m3"
     graph_boost_weight: float = 0.05
@@ -146,7 +149,12 @@ _LEGACY_ENV_MAP: dict[str, tuple[str, str]] = {
     "NEO4J_PASSWORD": ("store", "neo4j_password"),
     "QDRANT_HOST": ("store", "qdrant_host"),
     "QDRANT_PORT": ("store", "qdrant_port"),
+    "QDRANT_API_ENDPOINT": ("store", "qdrant_url"),
+    "QDRANT_URL": ("store", "qdrant_url"),
+    "QDRANT_API_TOKEN": ("store", "qdrant_api_key"),
+    "QDRANT_API_KEY": ("store", "qdrant_api_key"),
     "POSTGRES_URI": ("store", "postgres_uri"),
+    "LADYBUG_PATH": ("store", "ladybug_path"),
     "CLEW_WRITE_MODE": ("ci", "write_mode"),
     "CLEW_CI_TOKEN": ("ci", "ci_token"),
     "CLEW_VECTOR_ADAPTER": ("server", "vector_adapter"),

@@ -17,9 +17,18 @@ logger = logging.getLogger("clew.adapters.qdrant")
 class QdrantStore:
     """Qdrant implementation of VectorStore protocol."""
 
-    def __init__(self, host: str = "localhost", port: int = 6333, collection_name: str = "codebase"):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 6333,
+        url: str = "",
+        api_key: str = "",
+        collection_name: str = "codebase",
+    ):
         self.host = host
         self.port = port
+        self.url = url
+        self.api_key = api_key
         self.collection_name = collection_name
         self._client: AsyncQdrantClient | None = None
 
@@ -27,7 +36,10 @@ class QdrantStore:
     def client(self) -> AsyncQdrantClient:
         """Lazy-initialize the Qdrant client."""
         if self._client is None:
-            self._client = AsyncQdrantClient(host=self.host, port=self.port)
+            if self.url:
+                self._client = AsyncQdrantClient(url=self.url, api_key=self.api_key or None)
+            else:
+                self._client = AsyncQdrantClient(host=self.host, port=self.port)
         return self._client
 
     async def search(
@@ -56,7 +68,7 @@ class QdrantStore:
         must_conditions = []
 
         if repo:
-            must_conditions.append(models.FieldCondition(key="repo", match=models.MatchValue(value=repo)))
+            must_conditions.append(models.FieldCondition(key="repo_id", match=models.MatchValue(value=repo)))
 
         # Process additional filters
         if filters:
@@ -155,6 +167,8 @@ def _register_qdrant():
         return QdrantStore(
             host=settings.QDRANT_HOST,
             port=settings.QDRANT_PORT,
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
             collection_name=settings.QDRANT_COLLECTION,
         )
 

@@ -102,30 +102,18 @@ def setup_editor(editor: str, project_dir: Path, force: bool = False) -> str:
     """Write editor instruction file. Returns a status message."""
     cfg = EDITORS[editor]
     target = project_dir / cfg.path
+    existing = target.read_text() if target.exists() else ""
 
-    # Idempotency check
-    if target.exists():
-        existing = target.read_text()
-        if CLEW_MARKER in existing and not force:
-            return f"[skip] {cfg.path} already contains Clew directives. Use --force to overwrite."
+    if CLEW_MARKER in existing and not force:
+        return f"[skip] {cfg.path} already contains Clew directives. Use --force to overwrite."
 
     content = _format_for_editor(editor)
-
-    # Ensure parent directories exist
     target.parent.mkdir(parents=True, exist_ok=True)
 
-    if cfg.mode == "append" and target.exists():
-        existing = target.read_text()
-        if force and CLEW_MARKER in existing:
-            # Remove old Clew section before re-appending
-            before = existing.split(CLEW_MARKER)[0].rstrip()
-            target.write_text(before + content)
-        else:
-            # Append
-            with target.open("a") as f:
-                f.write(content)
+    if cfg.mode == "append" and existing:
+        base = existing.split(CLEW_MARKER)[0].rstrip() if (force and CLEW_MARKER in existing) else existing
+        target.write_text(base + content)
     else:
-        # Create / overwrite
         target.write_text(content)
 
     return f"[ok] Wrote Clew directives to {cfg.path}"

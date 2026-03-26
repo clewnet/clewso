@@ -28,7 +28,7 @@ def _clean_config():
 class TestDefaults:
     def test_default_api_url(self):
         cfg = ClewsoConfig()
-        assert cfg.api.url == "http://localhost:8000"
+        assert cfg.api.url == "http://localhost:8000/v1"
 
     def test_default_embeddings_provider(self):
         cfg = ClewsoConfig()
@@ -159,6 +159,33 @@ class TestEnvVars:
         _apply_env(cfg, {"CLEW_WRITE_MODE": "ci-only", "CLEW_CI_TOKEN": "tok-123"})
         assert cfg.ci.write_mode == "ci-only"
         assert cfg.ci.ci_token == "tok-123"
+
+    def test_legacy_qdrant_cloud_env(self):
+        cfg = ClewsoConfig()
+        _apply_env(
+            cfg,
+            {
+                "QDRANT_API_ENDPOINT": "https://xyz.aws.cloud.qdrant.io:6333",
+                "QDRANT_API_TOKEN": "tok-qdrant-123",
+            },
+        )
+        assert cfg.store.qdrant_url == "https://xyz.aws.cloud.qdrant.io:6333"
+        assert cfg.store.qdrant_api_key == "tok-qdrant-123"
+
+    def test_qdrant_url_alias(self):
+        cfg = ClewsoConfig()
+        _apply_env(cfg, {"QDRANT_URL": "https://alt.qdrant.io"})
+        assert cfg.store.qdrant_url == "https://alt.qdrant.io"
+
+    def test_qdrant_api_key_alias(self):
+        cfg = ClewsoConfig()
+        _apply_env(cfg, {"QDRANT_API_KEY": "key-alt"})
+        assert cfg.store.qdrant_api_key == "key-alt"
+
+    def test_canonical_qdrant_url(self):
+        cfg = ClewsoConfig()
+        _apply_env(cfg, {"CLEWSO_STORE_QDRANT_URL": "https://canonical.qdrant.io"})
+        assert cfg.store.qdrant_url == "https://canonical.qdrant.io"
 
     def test_legacy_server_adapters(self):
         cfg = ClewsoConfig()

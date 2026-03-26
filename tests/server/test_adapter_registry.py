@@ -95,8 +95,10 @@ def test_vector_store_registry_integration():
     # Check that standard adapters are registered
     registered_adapters = vector_store_registry.list_adapters()
 
-    assert "qdrant" in registered_adapters or len(registered_adapters) >= 0
-    # Note: Adapters may not register if dependencies are missing
+    assert len(registered_adapters) > 0, "No vector store adapters registered"
+    assert any(
+        name in registered_adapters for name in ("qdrant", "ladybug")
+    ), f"Expected qdrant or ladybug in {registered_adapters}"
 
 
 def test_graph_store_registry_integration():
@@ -106,8 +108,8 @@ def test_graph_store_registry_integration():
     # Check that standard adapters are registered
     registered_adapters = graph_store_registry.list_adapters()
 
-    assert "noop" in registered_adapters or len(registered_adapters) >= 0
-    # Note: Adapters may not register if dependencies are missing
+    assert len(registered_adapters) > 0, "No graph store adapters registered"
+    assert "noop" in registered_adapters, f"Expected noop in {registered_adapters}"
 
 
 def test_dependencies_use_registry(monkeypatch):

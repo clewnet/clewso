@@ -16,6 +16,7 @@ def mock_external_deps():
         "qdrant_client.http": MagicMock(),
         "qdrant_client.http.models": MagicMock(),
         "neo4j": MagicMock(),
+        "neo4j.exceptions": MagicMock(),
     }
 
     # Modules to force reload to ensure they use our mocks
@@ -89,9 +90,9 @@ def test_ingest_repo_integration(mock_external_deps, mock_repo):
                 "content": "def hello():\n    print('Hello')",
             }
         ]
-        # Run ingestion
+        # Run ingestion (explicitly use neo4j/qdrant adapters for this test)
         repo_id = "test-repo"
-        exit_code = ingest_repo(repo_id, mock_repo)
+        exit_code = ingest_repo(repo_id, mock_repo, store_config={"graph_adapter": "neo4j", "vector_adapter": "qdrant"})
 
         # Verify successful execution
         assert exit_code == 0

@@ -1,0 +1,187 @@
+# Language Registry
+#
+# Each [[language]] entry maps a tree-sitter grammar to its file extensions
+# and the AST node types used for extracting definitions, imports, and calls.
+# To add a new language, append a new [[language]] block.
+
+[[language]]
+name = "python"
+extensions = [".py"]
+definition_types = ["function_definition", "class_definition"]
+import_types = ["import_statement", "import_from_statement"]
+call_types = ["call"]
+
+[[language]]
+name = "javascript"
+extensions = [".js", ".jsx"]
+definition_types = ["function_declaration", "class_declaration", "method_definition"]
+import_types = ["import_statement"]
+call_types = ["call_expression"]
+
+[[language]]
+name = "typescript"
+extensions = [".ts", ".tsx"]
+definition_types = ["function_declaration", "class_declaration", "method_definition"]
+import_types = ["import_statement"]
+call_types = ["call_expression"]
+
+[[language]]
+name = "go"
+extensions = [".go"]
+definition_types = ["function_declaration", "method_declaration", "type_declaration"]
+import_types = ["import_declaration", "import_spec"]
+call_types = ["call_expression"]
+
+[[language]]
+name = "rust"
+extensions = [".rs"]
+definition_types = ["function_item", "struct_item", "enum_item", "trait_item", "impl_item", "type_item"]
+import_types = ["use_declaration"]
+call_types = ["call_expression", "macro_invocation"]
+
+[[language]]
+name = "cpp"
+extensions = [".cpp", ".cc", ".c", ".h", ".hpp"]
+definition_types = ["function_definition", "class_specifier", "struct_specifier", "namespace_definition"]
+import_types = ["preproc_include"]
+call_types = ["call_expression"]
+
+[[language]]
+name = "java"
+extensions = [".java"]
+definition_types = ["method_declaration", "class_declaration", "interface_declaration", "enum_declaration"]
+import_types = ["import_declaration"]
+call_types = ["method_invocation"]
+
+[[language]]
+name = "c_sharp"
+extensions = [".cs"]
+definition_types = ["method_declaration", "class_declaration", "interface_declaration", "struct_declaration", "enum_declaration"]
+import_types = ["using_directive"]
+call_types = ["invocation_expression"]
+
+[[language]]
+name = "ruby"
+extensions = [".rb"]
+definition_types = ["method", "class", "module", "singleton_method"]
+import_types = ["call"]
+call_types = ["call", "method_call"]
+
+[[language]]
+name = "php"
+extensions = [".php"]
+definition_types = ["function_definition", "class_declaration", "method_declaration"]
+import_types = ["namespace_use_declaration"]
+call_types = ["function_call_expression", "member_call_expression"]
+
+[[language]]
+name = "swift"
+extensions = [".swift"]
+definition_types = ["function_declaration", "class_declaration", "struct_declaration", "protocol_declaration", "enum_declaration"]
+import_types = ["import_declaration"]
+call_types = ["call_expression"]
+
+[[language]]
+name = "kotlin"
+extensions = [".kt", ".kts"]
+definition_types = ["function_declaration", "class_declaration", "object_declaration"]
+import_types = ["import_header"]
+call_types = ["call_expression"]
+
+[[language]]
+name = "scala"
+extensions = [".scala"]
+definition_types = ["function_definition", "class_definition", "object_definition", "trait_definition"]
+import_types = ["import_declaration"]
+call_types = ["call_expression"]
+
+[[language]]
+name = "lua"
+extensions = [".lua"]
+definition_types = ["function_declaration", "function_definition_statement"]
+import_types = []
+call_types = ["function_call"]
+
+[[language]]
+name = "elixir"
+extensions = [".ex", ".exs"]
+definition_types = ["call"]
+import_types = []
+call_types = []
+
+[[language]]
+name = "haskell"
+extensions = [".hs"]
+definition_types = ["function", "type_alias", "newtype", "adt"]
+import_types = ["import"]
+call_types = []
+
+[[language]]
+name = "ocaml"
+extensions = [".ml", ".mli"]
+definition_types = ["let_binding", "type_binding", "module_binding"]
+import_types = []
+call_types = []
+
+[[language]]
+name = "bash"
+extensions = [".sh", ".bash"]
+definition_types = ["function_definition"]
+import_types = []
+call_types = ["command"]
+
+[[language]]
+name = "html"
+extensions = [".html", ".htm"]
+definition_types = []
+import_types = []
+call_types = []
+
+[[language]]
+name = "css"
+extensions = [".css"]
+definition_types = []
+import_types = []
+call_types = []
+
+[[language]]
+name = "yaml"
+extensions = [".yaml", ".yml"]
+definition_types = []
+import_types = []
+call_types = []
+
+[[language]]
+name = "toml"
+extensions = [".toml"]
+definition_types = []
+import_types = []
+call_types = []
+
+[[language]]
+name = "json"
+extensions = [".json"]
+definition_types = []
+import_types = []
+call_types = []
+
+[[language]]
+name = "sql"
+extensions = [".sql"]
+definition_types = []
+import_types = []
+call_types = []
+
+[[language]]
+name = "zig"
+extensions = [".zig"]
+definition_types = ["function_declaration"]
+import_types = []
+call_types = ["call_expression"]
+
+[[language]]
+name = "dart"
+extensions = [".dart"]
+definition_types = ["function_signature", "class_definition", "method_signature"]
+import_types = ["import_or_export"]
+call_types = ["call_expression"]

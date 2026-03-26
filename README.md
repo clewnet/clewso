@@ -11,7 +11,7 @@
 </pre>
 </p>
 
-<h1 align="center">Clewso</h1>
+<h1 align="center">Clewso 🧶👀</h1>
 <h3 align="center">The Open Source Context Server for AI Agents.</h3>
 
 <p align="center">
@@ -32,10 +32,11 @@ Clewso indexes your codebase and gives AI agents **structured, navigable context
 ## Quick Start
 
 ```bash
-pip install clewso
-docker compose up -d        # Neo4j + Qdrant
-clewso index ./my-repo
-clewso setup-editor          # configure your AI editor
+uv tool install clewso       # or: pip install clewso
+clewso init                   # configure stores (local Docker or cloud)
+clewso index ./my-repo        # index your codebase
+clewso setup-editor           # configure your AI editor
+clewso review --staged        # graph-aware code review
 ```
 
 ## Features

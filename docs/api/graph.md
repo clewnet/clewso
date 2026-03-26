@@ -10,15 +10,17 @@ Traverse the code dependency graph from a starting node.
 {
   "start_node_id": "node-abc123",
   "relationship_types": ["IMPORTS", "CALLS"],
-  "depth": 2
+  "depth": 2,
+  "repo_id": "my-org/my-repo"
 }
 ```
 
-| Field | Type | Required | Description |
+| Field | Type | Default | Description |
 |---|---|---|---|
-| `start_node_id` | string | yes | Node ID to start traversal from |
-| `relationship_types` | string[] | no | Edge types to follow |
-| `depth` | int | no | Max hops (default: 2) |
+| `start_node_id` | string | required | Node ID to start traversal from |
+| `relationship_types` | string[] | `["IMPORTS", "CALLS", "CONTAINS", "DEFINES"]` | Edge types to follow |
+| `depth` | int | `2` | Max hops (1-3) |
+| `repo_id` | string | — | Scope traversal to a repository |
 
 ### Response
 
@@ -26,19 +28,30 @@ Traverse the code dependency graph from a starting node.
 {
   "nodes": [
     {
-      "id": "node-abc123",
-      "metadata": {
+      "id": "123",
+      "label": "File",
+      "properties": {
         "path": "src/auth/middleware.py",
-        "type": "module"
+        "repo_id": "my-org/my-repo"
       }
     }
   ],
   "edges": [
     {
-      "source": "node-def456",
-      "target": "node-abc123",
-      "type": "IMPORTS"
+      "id": "456",
+      "source": "789",
+      "target": "123",
+      "type": "IMPORTS",
+      "properties": {}
     }
   ]
 }
 ```
+
+## `GET /v1/graph/file/{file_path}/pull_requests`
+
+List pull requests that touched a file.
+
+## `GET /v1/graph/pull_request/{pr_number}/impact`
+
+Analyze the impact radius of a pull request.

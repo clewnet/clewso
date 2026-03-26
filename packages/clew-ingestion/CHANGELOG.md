@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.1.8](https://github.com/matchdav/clew-engine/compare/clewso-ingestion-v0.1.7...clewso-ingestion-v0.1.8) (2026-03-26)
+
+
+### Features
+
+* **ladybug:** implement LadybugUnifiedStore integration with enhanced store configuration and testing ([89a6947](https://github.com/matchdav/clew-engine/commit/89a6947e57f9cd9ca1fa1c91f28f19aeb656e92c))
+* **ladybug:** integration of embedded db ([e84898d](https://github.com/matchdav/clew-engine/commit/e84898da24c133254eaaace448370e9c7c9677cc))
+* update adapters and configurations for LadybugDB integration, enhancing graph and vector adapter support ([9f6f2d1](https://github.com/matchdav/clew-engine/commit/9f6f2d17c2a33c1881184f44e2d8d2bfa6035885))
+
+
+### Bug Fixes
+
+* streamline migration command help text and improve error messaging for LadybugDB locking ([32a9e6c](https://github.com/matchdav/clew-engine/commit/32a9e6c23e1b706cae6bb263f47b984991c039d6))
+
+## [0.1.7](https://github.com/matchdav/clew-engine/compare/clewso-ingestion-v0.1.6...clewso-ingestion-v0.1.7) (2026-03-20)
+
+
+### Features
+
+* add language registry and stdlib filter with TOML configuration ([d946ea9](https://github.com/matchdav/clew-engine/commit/d946ea9665dbc2faaed2bf13f5b43892b2280693))
+* handle Ctrl-C gracefully with pending write flush ([a5c3ad0](https://github.com/matchdav/clew-engine/commit/a5c3ad07dfc790bfbabbf29b78fb4019fa730346))
+* query actual Qdrant and Neo4j counts in finalization summary ([82ce860](https://github.com/matchdav/clew-engine/commit/82ce86007b8dbf9fa3e666de6a21733630796164))
+* retry Qdrant upserts on transient failures ([29e1da7](https://github.com/matchdav/clew-engine/commit/29e1da74f69f4c47deabd80503dab9fcef2c6261))
+* support Qdrant Cloud connection via URL and API key ([f4dcbec](https://github.com/matchdav/clew-engine/commit/f4dcbec33b008db09668c950dd47e724685ee495))
+
+
+### Bug Fixes
+
+* clear vector buffer before upsert to prevent unbounded growth ([a5bab08](https://github.com/matchdav/clew-engine/commit/a5bab0817d84648a8de9e5128172bd3acd0c10c2))
+* create Qdrant payload indexes and unblock event loop on upserts ([a3f384e](https://github.com/matchdav/clew-engine/commit/a3f384e495ff0be44db5275ed99a3935cb3e6f06))
+* derive human-readable repo_id from git remote instead of hashing ([4a1f7e4](https://github.com/matchdav/clew-engine/commit/4a1f7e40c5a404d024febfba49ab504fb881157f))
+* eigenhelm issues ([0ef48e3](https://github.com/matchdav/clew-engine/commit/0ef48e399089bfcbda70778dee71104b9c7c0eb6))
+* generate UUID point IDs instead of raw SHA256 hex strings ([b571a0e](https://github.com/matchdav/clew-engine/commit/b571a0e89cc4f37cfec7d6cca44d32c8492b0d03))
+* include Repository→File relationships in finalization count ([b958048](https://github.com/matchdav/clew-engine/commit/b9580489605429320a9df82f152e1b08764dd649))
+* include type in CodeBlock uniqueness constraint for Rust support ([2c510cf](https://github.com/matchdav/clew-engine/commit/2c510cf6260794c1d41ab4679b7de557bd923649))
+* make add_batch upsert directly instead of through shared buffer ([de1a56c](https://github.com/matchdav/clew-engine/commit/de1a56c94b596ef0640ed7bb5cbdbaa8612b8d6f))
+* move graph driver close from finalization to orchestrator ([5817175](https://github.com/matchdav/clew-engine/commit/5817175413df0384aeacb4c40764c138abcaa484))
+* serialize graph writes to prevent Neo4j deadlocks ([98e6250](https://github.com/matchdav/clew-engine/commit/98e62507dfe9776ffcfae8418074b154ad0c12e8))
+* use deterministic IDs for code block embeddings ([504fe23](https://github.com/matchdav/clew-engine/commit/504fe2328be7b8999d0e0770948b82ddc78b100e))
+* wire unified config into ingestion stores ([0362690](https://github.com/matchdav/clew-engine/commit/0362690aa36fbd1d3c6ec38f5e49969c9abba65d))
+
+
+### Performance Improvements
+
+* concurrent embedding requests and parallel embed+graph writes ([aa4df0d](https://github.com/matchdav/clew-engine/commit/aa4df0dc14e615d36288ea3591404896fb7bec26))
+* pipeline parsing and processing stages with async generators ([f3c28f5](https://github.com/matchdav/clew-engine/commit/f3c28f52a345e03a58101bca2a52e01a1e580791))
+* tune batch sizes for concurrent embedding throughput ([1097b77](https://github.com/matchdav/clew-engine/commit/1097b777c658dac79ca80e15234ecfa3822ce6d5))
+
 ## [0.1.6](https://github.com/matchdav/clew-engine/compare/clewso-ingestion-v0.1.5...clewso-ingestion-v0.1.6) (2026-03-19)
 
 
